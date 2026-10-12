@@ -13,7 +13,16 @@
 - **MCP**: stdio와 HTTP MCP 서버 연결, OAuth 인증, 필요할 때만 도구를 불러오는 지연 로딩
 - **데스크탑 펫**: 바탕화면에 떠 있는 캐릭터 창. 기분 체크인과 확인 질문을 받습니다
 
-## 준비
+## 설치 (Windows)
+
+[Releases](https://github.com/wndaasa/newbie-harness/releases/latest)에서 `Newbie-Setup-<버전>.exe`를 받아 실행합니다.
+
+- 관리자 권한 없이 사용자별로 `%LOCALAPPDATA%\Programs\Newbie`에 설치되고, 바탕화면과 시작 메뉴에 바로가기가 생깁니다
+- 설치 파일에 코드 서명이 없어 Windows SmartScreen 경고가 뜰 수 있습니다. 경고 창의 "추가 정보"를 누르고 "실행"을 고릅니다
+- 처음 실행하면 설정창의 제공자 탭에서 쓸 제공자의 API 키나 로컬 서버 주소를 넣습니다
+- 앱을 켤 때 새 버전을 확인하고, 있으면 사이드바 아래에 알립니다. 눌러서 받은 뒤 다시 시작하면 적용되고, 미루면 앱을 닫을 때 설치됩니다
+
+## 소스에서 실행
 
 Bun 1.3 이상이 필요합니다. 런타임은 Electron(Node)이고, Bun은 패키지 매니저와 스크립트 러너로 씁니다. 설치 파일 빌드는 Windows(NSIS)만 지원합니다.
 
