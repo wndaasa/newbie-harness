@@ -1,0 +1,68 @@
+{
+  "name": "newbie-harness",
+  "productName": "Newbie",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "repository": "github:wndaasa/newbie-harness",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "start": "electron-vite dev",
+    "app:build": "electron-vite build",
+    "app:smoke": "electron-vite build && NEWBIE_APP_SMOKE=1 NEWBIE_MOCK=1 electron .",
+    "app:dist": "electron-vite build && electron-builder --win",
+    "test": "bun run test:core && bun run test:ui",
+    "test:core": "bun test test/*.test.ts",
+    "_comment_test": "렌더러 테스트는 happy-dom을 전역에 등록해 fetch를 갈아끼운다. HTTP를 모킹하는 코어 테스트와 같은 프로세스에서 돌면 그쪽이 깨지므로 실행을 나눈다",
+    "test:ui": "bun test test/*.test.tsx",
+    "smoke": "bun ./scripts/smoke.ts",
+    "pet:start": "electron-vite build && electron . --pet",
+    "pet:smoke": "electron-vite build && electron . --pet --smoke",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "packageManager": "bun@1.3.12",
+  "trustedDependencies": [
+    "electron",
+    "koffi"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@napi-rs/canvas": "0.1.100",
+    "@vscode/ripgrep": "^1.18.0",
+    "electron-updater": "6.8.9",
+    "esbuild": "^0.28.1",
+    "highlight.js": "^11.11.1",
+    "katex": "0.16.47",
+    "koffi": "^3.1.5",
+    "kordoc": "^3.5.2",
+    "pdfjs-dist": "4.10.38",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^4.12.4",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.12.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^7"
+  }
+}

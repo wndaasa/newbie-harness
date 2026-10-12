@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- img-src에 data:를 허용해야 붙여넣은 첨부 이미지(base64)가 표시됨.
+         font-src의 data:는 빌드가 KaTeX 수식 폰트 일부를 data URL로 인라인하기 때문 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Newbie</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

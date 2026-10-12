@@ -1,0 +1,88 @@
+appId: com.newbie.app
+# index.ts가 app.setAppUserModelId로 쓰는 값과 같아야 Windows 토스트가 설치
+# 바로가기에 붙는다. 어긋나면 알림이 앱 이름 없이 뜬다
+productName: Newbie
+copyright: Newbie
+
+directories:
+  output: dist
+  buildResources: build
+
+# 기본값(**/*)에서 빼는 방식으로 간다. 허용 목록으로 적으면 electron-vite가
+# out/에 남기는 청크나 의존성 하나를 빠뜨렸을 때 실행 시점에야 드러난다.
+files:
+  - '**/*'
+  # 개발자 API 키가 설치 파일에 실려 배포되는 것을 막는다
+  - '!.env'
+  - '!.env.*'
+  # 원본 소스는 electron-vite가 out/으로 번들하므로 다시 넣지 않는다
+  - '!src/**'
+  - '!app/main/**'
+  - '!app/preload/**'
+  - '!app/renderer/**'
+  - '!test/**'
+  - '!docs/**'
+  - '!scripts/**'
+  - '!.github/**'
+  # 로컬 모델·도구 캐시(.gitignore 대상)는 수 GB가 될 수 있다
+  - '!models/**'
+  - '!tools/**'
+  - '!.newbie/**'
+  # onnxruntime-node(kordoc → @huggingface/transformers)는 모든 플랫폼 바이너리를
+  # 한 패키지에 담아 온다. win32 빌드에 나머지가 실려 300MB 가까이 불어난다
+  - '!**/onnxruntime-node/bin/napi-v6/darwin/**'
+  - '!**/onnxruntime-node/bin/napi-v6/linux/**'
+  - '!**/onnxruntime-node/bin/napi-v6/win32/arm64/**'
+  - '!*.md'
+  - '!*.sh'
+  - '!bun.lock'
+  - '!electron.vite.config.ts'
+  - '!electron-builder.yml'
+  - '!tsconfig.json'
+  - '!.editorconfig'
+
+# asar 안의 파일은 spawn 대상이나 dlopen 대상이 될 수 없다. 아래 넷은 전부
+# 실행 파일이나 네이티브 모듈이라 압축을 풀어 둬야 한다
+asarUnpack:
+  # search/searchFiles.ts이 spawn하는 rg.exe
+  - node_modules/@vscode/ripgrep-win32-x64/bin/**
+  # pdf 페이지 렌더링에 쓰는 skia 네이티브 모듈 (icudtl.dat도 같이 필요)
+  - node_modules/@napi-rs/canvas-win32-x64-msvc/**
+  # windowsJob.ts가 createRequire로 여는 FFI 모듈. 지금은 네이티브 바이너리가
+  # 없어 비활성 상태지만, 설치되면 asar 밖에 있어야 로드된다
+  - node_modules/koffi/**
+  # OCR 워커를 자식 프로세스로 fork한다
+  - node_modules/tesseract.js/**
+  # create_file·edit_file이 TS/JS 저장 전 구문 검사에 쓰는 esbuild가 spawn하는
+  # 실행 파일. 빠지면 설치본에서 매번 "esbuild를 찾을 수 없다"로 검사가 실패해,
+  # 실제로는 멀쩡한 코드도 구문 오류로 보고돼 저장이 계속 막힌다
+  - node_modules/@esbuild/win32-x64/**
+
+win:
+  target: nsis
+  icon: build/icon.png
+
+nsis:
+  # 사용자는 설치 프로그램을 실행하고 바로가기만 보면 되게 한다 — 경로도 묻지
+  # 않고, 관리자 권한도 필요 없는 사용자별 설치(%LOCALAPPDATA%\Programs\Newbie)
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Newbie
+  runAfterFinish: true
+
+# 네이티브 모듈은 전부 prebuilt로 들어온다. 켜 두면 bun 프로젝트에서 npm이
+# 끼어들어 node_modules 상태가 어긋난다
+npmRebuild: false
+
+# 자동 업데이트의 출처. 빌드 시 app-update.yml로 설치본에 들어가고, 앱의
+# electron-updater가 이 저장소의 Release에서 latest.yml과 설치 파일을 받는다
+# (app/main/updater.ts). 릴리스 업로드는 .github/workflows/release.yml이 한다.
+# 공개 저장소라 앱은 토큰 없이 받는다
+publish:
+  provider: github
+  owner: wndaasa
+  repo: newbie-harness
+  releaseType: release
