@@ -543,8 +543,14 @@ export function normalizeProvider(provider: string): string {
  */
 const APP_ONLY_ENV_KEY = /(_URL|_HOST|_API_KEY|_PATH)$/;
 
-export function loadDotEnv() {
-  const projectEnvPath = fileURLToPath(new URL('../.env', import.meta.url));
+/**
+ * appRoot는 앱 .env가 있는 폴더다. 번들하면 이 코드가 out/main/에 들어가 import.meta.url
+ * 기준 ../.env가 out/.env를 가리키므로, Electron 메인은 app.getAppPath()를 넘긴다
+ */
+export function loadDotEnv(appRoot?: string) {
+  const projectEnvPath = appRoot
+    ? resolve(appRoot, '.env')
+    : fileURLToPath(new URL('../.env', import.meta.url));
   const cwdEnvPath = resolve(process.cwd(), '.env');
   const envPaths = [...new Set([cwdEnvPath, projectEnvPath])];
 

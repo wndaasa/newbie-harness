@@ -73,7 +73,7 @@ const MCP_TEMPLATE = {
 // 검증용 헤드리스 모드: 창을 숨긴 채 렌더러 로드까지 확인하고 종료함
 const smokeMode = process.env.NEWBIE_APP_SMOKE === '1';
 
-loadDotEnv();
+loadDotEnv(app.getAppPath());
 
 // Windows 토스트 알림은 AppUserModelID가 있어야 앱 이름으로 뜬다.
 // 없으면 알림이 "electron.app.Electron" 이름으로 나가거나 아예 무시된다
