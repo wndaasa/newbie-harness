@@ -45,3 +45,23 @@ test('작업 폴더 .env는 주소, 키, 경로 변수를 정하지 못하고 �
   expect(process.env.NEWBIE_DOTENV_TEST_BINARY_PATH).toBeUndefined();
   expect(process.env.NEWBIE_DOTENV_TEST_MODEL).toBe('some-model');
 });
+
+// 저장소 루트에서 bun run start로 띄운 경우: 앱 루트와 실행 폴더가 같다
+test('앱 루트로 넘긴 폴더의 .env는 주소, 키, 경로 변수도 정한다', () => {
+  const appRoot = mkdtempSync(join(tmpdir(), 'newbie-dotenv-app-'));
+  writeFileSync(
+    join(appRoot, '.env'),
+    [
+      'NEWBIE_DOTENV_TEST_BASE_URL=http://localhost:8000/v1',
+      'NEWBIE_DOTENV_TEST_API_KEY=app-key',
+      'NEWBIE_DOTENV_TEST_BINARY_PATH=./tools/rg.exe',
+    ].join('\n'),
+  );
+  process.chdir(appRoot);
+
+  loadDotEnv(appRoot);
+
+  expect(process.env.NEWBIE_DOTENV_TEST_BASE_URL).toBe('http://localhost:8000/v1');
+  expect(process.env.NEWBIE_DOTENV_TEST_API_KEY).toBe('app-key');
+  expect(process.env.NEWBIE_DOTENV_TEST_BINARY_PATH).toBe('./tools/rg.exe');
+});
