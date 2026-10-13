@@ -80,9 +80,8 @@ export async function fetchContextWindow(
  */
 async function fetchVllmContextWindow(model: string): Promise<number | null> {
   const key = process.env.VLLM_API_KEY;
-  if (!key) return null;
   const response = await fetch(`${vllmBaseUrl()}/models`, {
-    headers: { authorization: `Bearer ${key}` },
+    headers: key ? { authorization: `Bearer ${key}` } : {},
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) return null;

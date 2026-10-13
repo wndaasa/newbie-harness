@@ -154,15 +154,22 @@ describe('vLLM 요청', () => {
     expect(url).toBe('http://server:8000/v1/chat/completions');
   });
 
-  test('키가 없으면 요청하지 않는다', async () => {
+  test('키가 있을 때만 인증 헤더를 붙인다', async () => {
     process.env.VLLM_BASE_URL = 'http://server:8000/v1';
-    delete process.env.VLLM_API_KEY;
-    captureRequest();
+    let headers: Record<string, string> = {};
+    globalThis.fetch = (async (_u: string, init: RequestInit) => {
+      headers = init.headers as Record<string, string>;
+      return new Response(new ReadableStream({ start: c => c.close() }), { status: 200 });
+    }) as never;
 
-    // 헤더 없이 나가면 401만 돌아오고 화면에는 이유가 드러나지 않는다
-    await expect(
-      runVllmTurn(request(256) as never, { output: OUTPUT } as never),
-    ).rejects.toThrow(/VLLM_API_KEY/);
+    process.env.VLLM_API_KEY = 'k';
+    await runVllmTurn(request(256) as never, { output: OUTPUT } as never);
+    expect(headers.authorization).toBe('Bearer k');
+
+    // --api-key 없이 띄운 서버는 헤더 없이 받는다. 키를 건 서버라면 401이 키 거부로 보인다
+    delete process.env.VLLM_API_KEY;
+    await runVllmTurn(request(256) as never, { output: OUTPUT } as never);
+    expect('authorization' in headers).toBe(false);
   });
 
   test('주소가 없으면 무엇을 넣어야 하는지 말해 준다', async () => {

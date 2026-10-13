@@ -43,12 +43,11 @@ async function listLlamaCppModels(): Promise<string[]> {
 // 가깝고, id는 --served-model-name 값이다. 걸러낼 잡음이 없어 그대로 쓴다
 async function listVllmModels(): Promise<string[]> {
   const key = process.env.VLLM_API_KEY;
-  if (!key) throw new Error('VLLM_API_KEY가 필요합니다.');
-  // 채팅과 같은 헤더를 붙인다. 빠뜨리면 401만 돌아오는데 화면에는 목록을 못
-  // 불러왔다고만 떠서 원인이 드러나지 않는다 — 실제로 그 상태를 겪었다
+  // 키가 있으면 채팅과 같은 헤더를 붙인다. 키를 건 서버에 키가 빠지거나 틀려서 오는
+  // 401은 fetchJson이 키 거부로 분류해 알려 준다
   const json = await fetchJson(
     `${vllmBaseUrl()}/models`,
-    { authorization: `Bearer ${key}` },
+    key ? { authorization: `Bearer ${key}` } : {},
     'vLLM',
   );
   return (json.data ?? []).map((m: { id: unknown }) => String(m.id)).sort();

@@ -34,7 +34,6 @@ import { readOpenAIStream } from './streams.ts';
 import { fetchWithRetry } from './fetchWithRetry.ts';
 import type { StreamResult } from './streams.ts';
 import {
-  requireApiKey,
   type ProviderContext,
   type ProviderRequest,
 } from './types.ts';
@@ -143,11 +142,14 @@ export async function runVllmTurn(
   }: ProviderRequest,
   { onRetry, output, signal }: ProviderContext,
 ): Promise<StreamResult> {
+  // --api-key 없이 띄운 서버는 헤더 없이 받는다. 키를 건 서버에 키가 빠지면 오는
+  // 401은 오류 분류가 키 거부로 알려 준다
+  const key = process.env.VLLM_API_KEY;
   const response = await fetchWithRetry(`${vllmBaseUrl()}${VLLM_CHAT_PATH}`, {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${requireApiKey('VLLM_API_KEY')}`,
       'content-type': 'application/json',
+      ...(key ? { authorization: `Bearer ${key}` } : {}),
     },
     body: JSON.stringify({
       model,
