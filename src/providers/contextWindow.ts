@@ -12,6 +12,13 @@ const FETCH_TIMEOUT_MS = 5_000;
 // provider:model → API로 조회된 창 크기
 const fetchedWindows = new Map<string, number>();
 
+/**
+ * Ollama에 보낼 기본 창 크기. Ollama는 요청에 num_ctx가 없으면 서버 기본값으로 모델을
+ * 올리는데, 그래픽카드 메모리가 24GiB 미만이면 4K라 에이전트가 쓰기에는 작다.
+ * 앱이 정한 창은 ollama.ts가 요청마다 num_ctx로 보내므로 그대로 실제 창이 된다
+ */
+export const OLLAMA_DEFAULT_NUM_CTX = 32_768;
+
 // Anthropic은 전 모델 200k (Sonnet 1M은 별도 베타 헤더가 필요해 제외)
 const ANTHROPIC_CONTEXT_WINDOW = 200_000;
 
@@ -30,7 +37,7 @@ const OPENAI_CONTEXT_WINDOWS: [string, number][] = [
   ['o4', 200_000],
 ];
 
-// 동기 조회: API 조회값 캐시 → 모델별 테이블 → 이름의 "32k" 표기 → 보수적 기본값
+// 동기 조회: API 조회값 캐시 → 모델별 테이블 → Ollama 기본값 → 이름의 "32k" 표기 → 보수적 기본값
 export function resolveContextWindow(provider: string, model: string): number {
   const fetched = fetchedWindows.get(`${provider}:${model}`);
   if (fetched) return fetched;
@@ -43,6 +50,8 @@ export function resolveContextWindow(provider: string, model: string): number {
     }
     return 128_000;
   }
+  // 조회 전이거나 조회에 실패해도 요청에는 이 값이 num_ctx로 나가므로 기본값과 맞춘다
+  if (provider === 'ollama') return OLLAMA_DEFAULT_NUM_CTX;
 
   const match = name.match(/(\d+)k/);
   if (match) return Number(match[1]) * 1000;
@@ -104,13 +113,13 @@ async function fetchOllamaContextWindow(model: string): Promise<number | null> {
   if (!response.ok) return null;
   const json = await response.json();
 
-  // Modelfile에 num_ctx가 있으면 그 값이 실제 창이고, 없으면 모델 최대값
+  // Modelfile에 num_ctx가 있으면 그 값을 쓰고, 없으면 기본값을 모델 최대치 안에서 쓴다
   const numCtx = String(json.parameters ?? '').match(/num_ctx\s+(\d+)/);
   if (numCtx) return Number(numCtx[1]);
   for (const [key, value] of Object.entries(json.model_info ?? {})) {
-    if (key.endsWith('.context_length')) return Number(value);
+    if (key.endsWith('.context_length')) return Math.min(Number(value), OLLAMA_DEFAULT_NUM_CTX);
   }
-  return null;
+  return OLLAMA_DEFAULT_NUM_CTX;
 }
 
 async function fetchLmStudioContextWindow(model: string): Promise<number | null> {
