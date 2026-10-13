@@ -5,9 +5,12 @@ import type { LogRole } from './types.ts';
 
 // 로그는 나중에 LLM 입력이 되므로 남기기 전에 자격 증명 형식을 가린다.
 const SENSITIVE_PATTERNS = [
-  /sk-[A-Za-z0-9]{10,}/g,
+  // OpenAI(sk-proj-, sk-svcacct-)와 Anthropic(sk-ant-) 키는 sk- 뒤에도 하이픈이 있다
+  /sk-[A-Za-z0-9_-]{10,}/g,
+  /tvly-[A-Za-z0-9_-]{10,}/g,
   /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi,
   /ghp_[A-Za-z0-9]{36}/g,
+  /github_pat_[A-Za-z0-9_]{20,}/g,
 ];
 
 const CODE_BLOCK_RE = /```[\s\S]*?```/g;

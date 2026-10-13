@@ -49,3 +49,18 @@ test('400자 이하 응답은 자르지 않는다', () => {
   appendToLog('assistant', text);
   expect(loggedBody()).toBe(text);
 });
+
+// sk- 뒤를 영숫자로만 보던 때는 하이픈이 든 최신 OpenAI, Anthropic 키가 그대로 남았다
+test('API 키 형식 문자열은 기록 전에 가린다', () => {
+  const keys = [
+    `sk-proj-${'a1B2'.repeat(12)}`,
+    `sk-ant-api03-${'x9Y8'.repeat(12)}`,
+    `tvly-dev-${'q7W6'.repeat(8)}`,
+    `github_pat_11ABCDEFG0_${'z'.repeat(40)}`,
+  ];
+  for (const key of keys) appendToLog('user', `이 키로 설정해 줘 ${key}`);
+
+  const log = readFileSync(getDailyLogPath(), 'utf8');
+  for (const key of keys) expect(log).not.toContain(key);
+  expect(log.match(/\[REDACTED\]/g)?.length).toBe(keys.length);
+});
