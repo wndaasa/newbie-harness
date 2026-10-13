@@ -5,8 +5,11 @@
 
 // 나중에 다른 OCR 엔진(Scribe.js 등)으로 바꾸고 싶으면, 이 파일 안쪽 구현만 갈아끼우면 되고
 // 이 파일을 가져다 쓰는 다른 코드는 전혀 손댈 필요가 없습니다.
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import * as Tesseract from 'tesseract.js';
 import type { OcrProvider } from 'kordoc';
+import { getNewbieHome } from '../memory/globalNewbie.ts';
 
 // tesseract.js의 OCR 엔진(worker)은 하나 띄우는 데 시간이 걸리기 때문에,
 // 매번 새로 만들지 않고 앱이 켜져 있는 동안 딱 하나만 만들어서 계속 재사용함.
@@ -14,9 +17,14 @@ import type { OcrProvider } from 'kordoc';
 let workerPromise: Promise<Tesseract.Worker> | null = null;
 
 // worker를 가져오는 함수. 이미 있으면 그대로 반환하고, 없으면 새로 하나 만듦(한/영 인식).
+// 언어 데이터(kor.traineddata, eng.traineddata)는 ~/.newbie/ocr에 받아 둠. cachePath를 안 주면
+// tesseract.js가 현재 폴더에 저장하는데, 앱은 작업 폴더로 이동해 있어서 사용자 프로젝트에 파일이 생김.
+// tesseract.js는 캐시 폴더를 만들어 주지 않으므로 먼저 만들어 둠.
 function getWorker(): Promise<Tesseract.Worker> {
   if (!workerPromise) {
-    workerPromise = Tesseract.createWorker('kor+eng');
+    const cachePath = join(getNewbieHome(), 'ocr');
+    mkdirSync(cachePath, { recursive: true });
+    workerPromise = Tesseract.createWorker('kor+eng', undefined, { cachePath });
   }
   return workerPromise;
 }
