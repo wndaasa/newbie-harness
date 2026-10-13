@@ -64,7 +64,8 @@ win:
 
 nsis:
   # 사용자는 설치 프로그램을 실행하고 바로가기만 보면 되게 한다 — 경로도 묻지
-  # 않고, 관리자 권한도 필요 없는 사용자별 설치(%LOCALAPPDATA%\Programs\Newbie)
+  # 않고, 관리자 권한도 필요 없는 사용자별 설치. 원클릭 사용자별 설치는 productName이
+  # 아니라 package.json의 name을 폴더 이름으로 쓴다(%LOCALAPPDATA%\Programs\newbie-harness)
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false

@@ -13,25 +13,32 @@
 - **MCP**: stdio와 HTTP MCP 서버 연결, OAuth 인증, 필요할 때만 도구를 불러오는 지연 로딩
 - **데스크탑 펫**: 바탕화면에 떠 있는 캐릭터 창. 기분 체크인과 확인 질문을 받습니다
 
+## 지원 환경
+
+- Windows x64용 설치 파일만 배포합니다
+- 소스 실행은 Windows에서만 확인했고, macOS와 Linux에서는 확인하지 않았습니다
+- 화면은 한국어만 지원합니다
+- git 관련 도구(`run_git`, worktree)를 쓰려면 PATH에 git이 있어야 합니다
+
 ## 설치 (Windows)
 
 [Releases](https://github.com/wndaasa/newbie-harness/releases/latest)에서 `Newbie-Setup-<버전>.exe`를 받아 실행합니다.
 
-- 관리자 권한 없이 사용자별로 `%LOCALAPPDATA%\Programs\Newbie`에 설치되고, 바탕화면과 시작 메뉴에 바로가기가 생깁니다
+- 관리자 권한 없이 사용자별로 `%LOCALAPPDATA%\Programs\newbie-harness`에 설치되고, 바탕화면과 시작 메뉴에 바로가기가 생깁니다
 - 설치 파일에 코드 서명이 없어 Windows SmartScreen 경고가 뜰 수 있습니다. 경고 창의 "추가 정보"를 누르고 "실행"을 고릅니다
 - 처음 실행하면 설정창의 제공자 탭에서 쓸 제공자의 API 키나 로컬 서버 주소를 넣습니다
 - 앱을 켤 때 새 버전을 확인하고, 있으면 사이드바 아래에 알립니다. 눌러서 받은 뒤 다시 시작하면 적용되고, 미루면 앱을 닫을 때 설치됩니다
 
 ## 소스에서 실행
 
-Bun 1.3 이상이 필요합니다. 런타임은 Electron(Node)이고, Bun은 패키지 매니저와 스크립트 러너로 씁니다. 설치 파일 빌드는 Windows(NSIS)만 지원합니다.
+Bun 1.3 이상과 Node.js 22.12 이상이 필요합니다. 런타임은 Electron(Node)이고, Bun은 패키지 매니저와 스크립트 러너로 씁니다. `bun install`이 끝나면 `postinstall`이 `node`로 Electron 실행 파일을 내려받습니다. 설치 파일 빌드는 Windows(NSIS)만 지원합니다.
 
 ```powershell
 bun install
 Copy-Item .env.example .env
 ```
 
-`.env`에서 사용할 제공자와 API 키를 설정합니다. 앱을 실행한 뒤 설정창의 제공자 탭에서 입력해도 됩니다. 로컬 서버(Ollama, LM Studio, llama.cpp, vLLM)를 쓰면 API 키 없이 실행할 수 있습니다.
+`.env`에서 쓸 줄의 주석을 풀고 제공자와 API 키를 넣습니다. 앱을 실행한 뒤 설정창의 제공자 탭에서 입력해도 되는데, `.env`에 넣은 값이 설정창에 저장한 값보다 우선합니다. 로컬 서버(Ollama, LM Studio, llama.cpp, vLLM)를 쓰면 API 키 없이 실행할 수 있습니다.
 
 `bun run start`에서 `Error: Electron uninstall`이 나면 Electron 실행 파일이 내려받히지 않은 것입니다. 아래 명령으로 직접 내려받습니다.
 
@@ -74,7 +81,7 @@ bun run app:smoke    # 앱 빌드 + 헤드리스 UI 왕복 스모크
 | llama.cpp | `qwen3-8b` (llama-server의 `--alias` 값) | `LLAMACPP_BASE_URL`, `LLAMACPP_MODEL`, `LLAMACPP_API_KEY` |
 | vLLM | 설정 필요 (`--served-model-name` 값) | `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_API_KEY` |
 
-시작 제공자는 `NEWBIE_PROVIDER`로 지정하고, 실행 중에는 설정창의 제공자 탭이나 `/provider`, `/model` 명령으로 바꿉니다.
+새 대화의 기본 제공자와 모델은 설정창의 제공자 탭이나 `NEWBIE_PROVIDER`, 제공자별 `*_MODEL` 환경 변수로 정합니다. 지금 대화의 제공자와 모델은 `/provider`, `/model` 명령이나 코딩 탭의 모델 칩으로 바꿉니다.
 
 설정창에서 입력한 API 키는 Electron safeStorage(Windows에서는 DPAPI)로 암호화해 `~/.newbie/credentials.enc`에 저장합니다. 화면에는 가린 값만 표시하고, 에이전트가 실행하는 셸 명령과 MCP 서버에는 넘기지 않습니다.
 
@@ -82,6 +89,12 @@ bun run app:smoke    # 앱 빌드 + 헤드리스 UI 왕복 스모크
 
 - `run_model.sh`: llama-server로 GGUF 모델을 OpenAI 호환 API로 띄우는 스크립트입니다. 실측한 설정값과 이유를 주석에 적어 두었습니다
 - `setup_win_vulkan.sh`: Windows용 llama.cpp Vulkan 빌드를 `tools/llama.cpp`에 설치합니다 (AMD 그래픽카드용)
+- **Ollama 컨텍스트 창**: 요청마다 `num_ctx`를 함께 보내 앱이 아는 창 크기와 맞춥니다
+  - 기본값은 32K이고, 모델 최대치가 더 작으면 그 값을 씁니다
+  - Ollama 앱에서 정한 창 크기는 쓰지 않습니다
+  - 다른 크기를 쓰려면 Modelfile에 `num_ctx`를 적은 모델을 만듭니다
+  - 실제로 잡힌 크기는 `ollama ps`로 확인합니다
+- **vLLM API 키**: 서버를 `--api-key`로 띄웠을 때만 넣습니다
 
 ## 에이전트 도구
 
@@ -98,8 +111,9 @@ bun run app:smoke    # 앱 빌드 + 헤드리스 UI 왕복 스모크
 | `run_git` | 읽기 전용 git 명령 (log, diff, blame 등) |
 | `worktree_add`, `worktree_list`, `worktree_remove` | git worktree 관리 |
 | `capture_page` | HTML 파일이나 URL을 열어 스크린샷으로 확인 |
-| `web_search`, `web_fetch` | Tavily 웹 검색, 웹 페이지 가져오기 (`TAVILY_API_KEY` 필요) |
-| `spawn_agent` | 조사 작업을 보조 에이전트에 위임 |
+| `web_search` | Tavily 웹 검색 (`TAVILY_API_KEY` 필요) |
+| `web_fetch` | 웹 페이지 가져오기 |
+| `spawn_agent` | 보조 에이전트에 일을 나눠 맡김. 조사 전용 `explore`와 파일 수정까지 하는 `general`이 있고, 동시에 최대 4개까지 돌아감 |
 | `search_tools`, `load_tools` | 지연 로드 도구와 MCP 서버 도구를 찾아 목록에 적재 |
 
 에이전트가 만든 임시 파일과 산출물은 작업 폴더의 `.newbie/` 아래에 둡니다. 이 폴더는 자동으로 git 제외 처리하지 않으므로 커밋할지는 직접 정합니다.
@@ -112,7 +126,9 @@ bun run app:smoke    # 앱 빌드 + 헤드리스 UI 왕복 스모크
 | `acceptEdits` 편집 수락 | 파일 읽기와 쓰기 자동 허용, 셸 실행은 승인 요청 |
 | `ask` 권한 요청 | 읽기만 자동, 쓰기와 셸 실행은 승인 요청 |
 
-`/mode <이름>` 명령이나 입력창 아래 권한 칩으로 바꿉니다.
+`/mode <이름>` 명령이나 코딩 탭 입력창 아래의 권한 칩으로 바꿉니다.
+
+MCP 도구는 서버가 읽기 전용(`readOnlyHint: true`)으로 표시한 것만 승인 없이 실행합니다. 자동 모드에서 `destructiveHint: false`로 표시된 도구는 분류기가 판정하고, 나머지는 승인을 받습니다.
 
 ## 대화 중 명령어
 
@@ -127,11 +143,12 @@ bun run app:smoke    # 앱 빌드 + 헤드리스 UI 왕복 스모크
 | `/checkin` | 오늘 기분을 기록하고 확인 질문에 답하기 |
 | `/reflect` | 쌓인 체크인 데이터로 기분 패턴 되비추기 |
 | `/sessions` | 저장된 세션 목록 |
-| `/resume [session-id]` | 저장된 세션 불러오기 (`/continue`는 별칭) |
+| `/resume [session-id]` | ID 없이 쓰면 저장된 세션 목록, ID를 주면 그 세션 불러오기 |
+| `/continue` | 가장 최근 세션을 바로 이어서 시작 |
 | `/provider [name]` | 제공자 확인, 변경 |
 | `/model [name]` | 모델 확인, 변경 |
 | `/mode [이름]` | 권한 모드 확인, 변경 |
-| `/mcp` | MCP 서버 연결 상태 확인 |
+| `/mcp` | MCP 서버 연결 상태 확인. `/mcp reconnect [서버]`는 다시 연결, `/mcp auth <서버>`는 인증 다시 받기 |
 | `/exit` | 종료 |
 
 입력창에서 `/`를 입력하면 명령어 추천이 표시되고 `Tab`으로 자동완성됩니다.
@@ -148,20 +165,51 @@ MCP 서버는 `~/.newbie/mcp.json`에 등록합니다. 설정창의 MCP 탭에�
 }
 ```
 
-stdio 서버는 `command`, `args`, `env`로 등록합니다. 연결 상태는 `/mcp`로 확인합니다.
+stdio 서버는 `command`, `args`, `env`로 등록합니다. 켜 둔 서버는 앱을 켤 때 자동으로 연결되고, 연결 상태는 `/mcp`로 확인합니다. 설정을 고친 뒤 다시 연결하려면 `/mcp reconnect`를 씁니다.
 
 ## 메모리
 
-대화는 `~/.newbie/memory/logs/`에 자동 기록되고, `/distill`이 로그를 user / feedback / project / reference 타입의 메모리 파일로 정리합니다. 다음 세션 시작 시 MEMORY.md 인덱스와 관련 메모리가 시스템 프롬프트에 주입됩니다.
+대화는 `~/.newbie/memory/logs/`에 자동으로 기록되고, 아래 세 경우에 user / feedback / project / reference 타입의 메모리 파일로 정리됩니다.
 
-대화 로그에는 입력한 내용과 `/checkin` 기분 기록이 그대로 남고, 기억 정리 때 설정한 LLM 제공자로 전송됩니다. API 키 형식의 문자열은 기록 전에 가립니다. 기록을 원하지 않으면 아래 `NEWBIE_DISABLE_LOGGING`을 설정합니다.
+1. 앱을 켤 때 아직 정리하지 않은 로그가 있으면 자동으로 정리
+2. "정정할게", "틀렸"처럼 직전 내용을 고치는 말을 하면 바로 다시 정리
+3. `/distill`을 직접 실행
 
-사용자가 직접 쓰는 파일과 생성되는 데이터는 소유권이 다르므로 디렉터리를 나눕니다. `~/.newbie/Newbie.md`(전역 지시)와 `~/.newbie/policy.md`(무엇을 유지, 요약, 제거할지 정하는 메모리 정책)는 사용자 소유이고, `~/.newbie/memory/` 아래는 전부 `/distill`이 생성하고 갱신합니다. 프로젝트 폴더에 `Newbie.md`를 두면 그 프로젝트의 작업 규칙으로 함께 주입됩니다.
+정리된 메모리 중 `MEMORY.md` 인덱스와 최근에 갱신된 메모리 5개가 매 턴 시스템 프롬프트에 들어갑니다. 채팅 탭과 코딩 탭 모두 해당합니다.
 
-- `NEWBIE_NO_MEMORY=1`: 메모리 리콜 비활성화
-- `NEWBIE_DISABLE_LOGGING=1`: 대화 로그 기록 비활성화
-- `NEWBIE_DISABLE_NEWBIE_MD=1`: Newbie.md 지침 주입 비활성화
-- `NEWBIE_HOME`: 데이터 저장 위치 변경 (기본 `~/.newbie`)
+대화 로그에는 입력한 내용, 답변의 앞뒤 일부, `/checkin`과 펫의 기분 기록이 남습니다. 입력은 300자까지 남기고 슬래시 명령은 남기지 않으며, 답변에서는 코드와 긴 URL을 뺍니다. 로그는 기억을 정리할 때 지금 쓰는 LLM 제공자로 전송됩니다. OpenAI, Anthropic, Tavily 키와 GitHub 토큰 형식의 문자열은 기록 전에 가립니다. 기록을 원하지 않으면 아래 `NEWBIE_DISABLE_LOGGING`을 설정합니다.
+
+사용자가 직접 쓰는 파일과 앱이 만드는 데이터는 디렉터리를 나눕니다. `~/.newbie/Newbie.md`(전역 지시)와 `~/.newbie/policy.md`(무엇을 유지, 요약, 제거할지 정하는 메모리 정책)는 사용자가 쓰는 파일이고, `~/.newbie/memory/` 아래는 앱이 만들고 갱신합니다. 프로젝트 폴더에 `Newbie.md`를 두면 코딩 탭에서 그 프로젝트의 작업 규칙으로 함께 들어갑니다. 이 저장소 루트의 `Newbie.md`가 그 예로, 이 앱으로 이 저장소를 작업할 때 쓰는 규칙입니다.
+
+- `NEWBIE_NO_MEMORY=1`: 메모리를 시스템 프롬프트에 넣지 않고, 앱을 켤 때 자동 정리도 하지 않음
+- `NEWBIE_DISABLE_LOGGING=1`: 대화 로그 기록 끔
+- `NEWBIE_DISABLE_NEWBIE_MD=1`: `Newbie.md` 지침을 넣지 않음
+- `NEWBIE_HOME`: 앱 데이터 위치 변경 (기본 `~/.newbie`)
+  - API 키, 세션, MCP 설정, 메모리, OCR 데이터가 모두 이 아래에 저장됨
+
+## 외부로 나가는 데이터
+
+- **LLM 제공자**: 대화 내용과 시스템 프롬프트를 지금 쓰는 제공자로 보냅니다
+  - 시스템 프롬프트에는 설정창의 이름과 지침, `Newbie.md`, 메모리가 들어갑니다
+  - 코딩 탭에서는 매 턴 작업 폴더 경로와 git 상태가 붙습니다
+  - 로컬 제공자를 쓰면 지정한 서버로만 나갑니다
+- **Tavily**: `web_search`를 쓸 때 검색어를 보냅니다
+- **웹 페이지**: `web_fetch`가 요청한 주소에 직접 접속합니다
+- **MCP 서버**: 켜 둔 서버에 앱을 켤 때 자동으로 연결합니다
+- **GitHub Releases**: 설치본은 켤 때마다 새 버전을 확인합니다
+- **OCR 언어 데이터**: 처음 OCR을 쓸 때 cdn.jsdelivr.net에서 한국어와 영어 데이터를 내려받아 `~/.newbie/ocr`에 둡니다
+
+### 대화 외에 나가는 LLM 요청
+
+아래 요청도 지금 쓰는 제공자로 나가므로 사용량에 포함됩니다.
+
+- **분류기**: 자동 모드에서 허용목록 밖 셸 명령, 작업 폴더 밖 쓰기, 일부 MCP 도구를 판정할 때마다 한 번
+  - 모델은 Anthropic이면 `claude-haiku-4-5-20251001`, OpenAI면 `gpt-5.6-luna`, 나머지 제공자는 대화 모델
+  - `NEWBIE_CLASSIFIER_MODEL`로 바꿀 수 있음
+- **자동 제목**: 새 대화의 첫 턴이 끝난 뒤 한 번
+- **이력 압축**: 컨텍스트 창이 찼을 때와 `/compact`
+- **기억 정리**: 앱을 켤 때, 정정했을 때, `/distill`
+- **`/remember`**: 저장할 내용의 이름과 분류를 정할 때
 
 ## 프로젝트 구조
 
@@ -172,14 +220,14 @@ app/renderer/        React 채팅 UI, pet.html(데스크탑 펫 창)
 src/config.ts        환경 변수, 세션 생성, 시스템 프롬프트
 src/agent/           에이전트 루프, 권한 모드, 셸 명령 분류기, 이력 압축
 src/commands/        슬래시 명령어 레지스트리
-src/providers/       Anthropic, OpenAI, Ollama, LM Studio, llama.cpp, vLLM, mock
+src/providers/       Anthropic, OpenAI, Ollama, LM Studio, llama.cpp, vLLM, mock, 오류 분류
 src/tools/           에이전트 도구 (파일, 검색, 셸, git, 웹, 화면 캡처, 보조 에이전트, worktree)
 src/mcp/             MCP 클라이언트, OAuth, 도구 브리지
 src/memory/          대화 로그 기록, /distill 기억 정리, 리콜
 src/session/         세션 저장과 복원, 자동 제목
 src/settings/        사용자 설정
 src/websearch/       Tavily 웹 검색
-src/utils/           OCR, PDF 렌더, 오류 분류, Windows 프로세스 수명
+src/utils/           OCR, PDF 렌더, 자식 프로세스에 넘기지 않을 키 목록, Windows 프로세스 수명
 src/ui/              도구 라벨, 색상, 폭 계산 유틸
 src/cli/             스모크용 단일 턴 실행
 scripts/smoke.ts     헤드리스 코어 스모크
