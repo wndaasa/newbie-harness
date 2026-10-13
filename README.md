@@ -234,6 +234,12 @@ scripts/smoke.ts     헤드리스 코어 스모크
 test/                단위 테스트 (bun test)
 ```
 
+## 만든 사람
+
+- [Lim younggi](https://github.com/wndaasa)
+- [Park Jin Yeong](https://github.com/jinnyng): 메모리, 기분 체크인, 데스크탑 펫
+- [guunman](https://github.com/guunman): 화면 분할, worktree, 파일 읽기 도구, LM Studio 연동, OCR
+
 ## 라이선스
 
 MIT. `LICENSE` 파일을 참고하세요.
