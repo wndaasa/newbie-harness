@@ -98,32 +98,3 @@ Error: Electron uninstall
 ```powershell
 node node_modules/electron/install.js
 ```
-
-## 8. 릴리스 (메인테이너)
-
-`dev`에서 `package.json`의 `version`과 `src/config.ts`의 `APP_VERSION`을 올린 커밋(`chore: x.y.z`)을 푸시한 뒤 같은 버전의 태그를 푸시합니다. `.github/workflows/release.yml`이 태그를 받아 Windows 설치 파일을 만들어 GitHub Release에 올리고, 설치본의 업데이터가 그 Release를 봅니다. 태그와 `package.json` 버전이 다르면 워크플로가 실패합니다.
-
-앱 화면의 버전은 `package.json`에서 읽고, `APP_VERSION`은 MCP 서버에 알리는 클라이언트 버전과 User-Agent에 쓰입니다.
-
-버전 기준은 아래를 따릅니다.
-
-- `patch`: 버그 수정, 문서 보완, 작은 UI 수정
-- `minor`: 기능 추가, provider 추가, 세션 저장 같은 새 기능
-- `major`: 기존 사용법이 깨지는 큰 변경
-
-릴리스 워크플로는 테스트를 돌리지 않으므로, 태그를 푸시하기 전에 `dev`에서 직접 검증합니다.
-
-```powershell
-bun run typecheck
-bun run test
-bun run smoke
-```
-
-태그를 만들고 푸시합니다.
-
-```powershell
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-릴리스한 뒤에는 `dev`를 `main`에 머지해 안정 버전을 맞춥니다.
