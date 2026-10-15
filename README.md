@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/assets/Newbie_logo_v1.png" width="120" alt="Newbie 로고">
+</p>
+
 # newbie-harness
 
 여러 LLM 제공자를 바꿔 가며 쓸 수 있는 Electron 데스크탑 에이전트 앱 **Newbie**입니다. 클라우드 모델(OpenAI, Anthropic)과 로컬 모델(Ollama, LM Studio, llama.cpp, vLLM)을 같은 화면에서 쓰고, 에이전트가 파일을 읽고 고치고 명령을 실행하며 작업합니다.
