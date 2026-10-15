@@ -2137,6 +2137,42 @@ button > .icon:only-child {
   border-color: var(--accent);
 }
 
+/* 제공자가 준비되지 않았을 때 시작 칩 자리에 뜨는 연결 안내. 오류가 아니라 첫 할 일이라 중립색 */
+.home-hero-setup {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+  max-width: 440px;
+  padding: 18px 22px;
+}
+
+.home-hero-setup-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.home-hero-setup-body {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 6px 0 14px;
+}
+
+.home-hero-setup-action {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--on-accent);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: var(--pad-button);
+}
+
 /* 시작 루틴(recall·distill)의 system 알림 — 히어로 아래에 작게 */
 .home-hero-notices {
   display: flex;

@@ -74,7 +74,9 @@ export function Pane({
   onSetReasoningEffort,
   onOpenAgent,
   onOpenSettings,
+  onOpenProviderSettings,
   onOpenDiff,
+  providerReady,
 }: {
   sessionName: string;
   state: PaneState;
@@ -97,7 +99,11 @@ export function Pane({
   onSetReasoningEffort: (value: string) => void;
   onOpenAgent: (id: string) => void;
   onOpenSettings: () => void;
+  /** 홈 화면 연결 안내의 버튼: 설정창을 제공자 탭으로 연다 */
+  onOpenProviderSettings: () => void;
   onOpenDiff: () => void;
+  /** 지금 제공자로 대화할 수 있는가. false면 홈 화면에 연결 안내를 띄운다 */
+  providerReady: boolean;
 }) {
   const fileRef = React.useRef<HTMLInputElement>(null);
   // 이 칸의 성격은 자기 세션의 mode로 정한다 — 사이드바 탭(전역)이 아니다
@@ -149,7 +155,9 @@ export function Pane({
             chat={paneTab === 'chat'}
             hasSessions
             notices={state.rows.map(row => row.content)}
+            onOpenProviderSettings={onOpenProviderSettings}
             onSubmit={onSubmit}
+            providerReady={providerReady}
           />
         ) : (
           <Transcript

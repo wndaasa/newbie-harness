@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('newbie', {
   credentials: () => ipcRenderer.invoke('newbie:credentials'),
   saveCredentials: (patch: Record<string, string>) =>
     ipcRenderer.invoke('newbie:save-credentials', patch),
+  providerReady: () => ipcRenderer.invoke('newbie:provider-ready'),
   providerModels: (provider: string) =>
     ipcRenderer.invoke('newbie:provider-models', provider),
   models: () => ipcRenderer.invoke('newbie:models'),

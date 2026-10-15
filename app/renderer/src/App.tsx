@@ -94,6 +94,9 @@ export function App() {
   const [agentPanelId, setAgentPanelId] = useState<string | null>(null);
   const seenAgents = useRef(new Set<string>());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 홈 화면의 연결 안내에서 열면 제공자 탭부터 보여 준다
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'provider'>('general');
+  const [providerReady, setProviderReady] = useState(true);
   const resizeState = useRef<{ startX: number; startWidth: number } | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   // 사이드바에서 세션을 끌고 있는 중인지 — 칸의 드롭존을 띄우는 신호
@@ -147,6 +150,7 @@ export function App() {
     void window.newbie.init().then(state => {
       if (disposed) return;
       setInitial(state);
+      setProviderReady(state.providerReady);
       setTabMode(state.tabMode);
       setWorkspace(state.workspace);
       // 첫 칸: init이 준 세션 하나로 시작한다 (앱 시작은 항상 1칸)
@@ -249,6 +253,8 @@ export function App() {
             },
             tokens: event.tokens ?? state.tokens,
           }));
+          // 모델 칩에서 키가 필요 없는 제공자로 바꿔도 준비 상태가 달라진다
+          void window.newbie.providerReady().then(setProviderReady);
           break;
         case 'sessions-changed':
           refreshSessions();
@@ -564,7 +570,14 @@ export function App() {
   }, []);
 
   // 행 컴포넌트가 memo라 새 함수를 매번 내리면 모든 행이 다시 그려진다
-  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const openSettings = useCallback(() => {
+    setSettingsInitialTab('general');
+    setSettingsOpen(true);
+  }, []);
+  const openProviderSettings = useCallback(() => {
+    setSettingsInitialTab('provider');
+    setSettingsOpen(true);
+  }, []);
 
   // 사이드바 업데이트 줄. 받기와 설치 모두 사용자가 확인해야 진행된다 — 모르는
   // 사이 앱이 바뀌는 것이 불안하다는 피드백에서 자동 받기를 뺐다
@@ -868,6 +881,7 @@ export function App() {
                     setDiffPanelOpen(open => !open);
                     setAgentPanelId(null);
                   }}
+                  onOpenProviderSettings={openProviderSettings}
                   onOpenSettings={openSettings}
                   onRemoveFile={fileIndex =>
                     updatePane(pane.sessionId, s => ({
@@ -886,6 +900,7 @@ export function App() {
                   onSetProvider={name => window.newbie.setProvider(name)}
                   onSetReasoningEffort={value => window.newbie.setReasoningEffort(value)}
                   onSubmit={text => submitFromPane(pane.sessionId, text)}
+                  providerReady={providerReady}
                   sessionName={sessionNameOf(pane.sessionId)}
                   showHeader={showHeaders}
                   state={state}
@@ -926,7 +941,16 @@ export function App() {
 
       {alert && <AlertPopup onClose={() => setAlert('')} text={alert} />}
 
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsModal
+          initialTab={settingsInitialTab}
+          onClose={() => {
+            setSettingsOpen(false);
+            // 설정창에서 넣은 키는 바로 환경에 반영된다. 연결 안내를 거둘지 다시 확인한다
+            void window.newbie.providerReady().then(setProviderReady);
+          }}
+        />
+      )}
 
       {confirm && (
         <ConfirmDialog

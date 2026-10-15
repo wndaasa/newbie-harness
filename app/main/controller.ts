@@ -127,7 +127,10 @@ export function createController({
    */
   notify?: (info: { body: string; sessionId: string; title: string; viewing: boolean }) => void;
   quit: () => void;
-  /** 앱은 떴지만 대화는 못 하는 상태(예: API 키 없음)를 홈 화면에 남길 문구 */
+  /**
+   * 앱은 떴지만 대화는 못 하는 상태(예: API 키 없음)일 때의 사유. 있으면 시작 시
+   * 기억 정리를 건너뛴다. 사용자 안내는 홈 화면이 isProviderReady로 따로 띄운다
+   */
   startupNotice?: string;
 }) {
   /**
@@ -438,6 +441,20 @@ export function createController({
     recordSessionConfig(target);
   }
 
+  /*
+   * 지금 제공자로 대화할 수 있는가(키·주소가 있는가). 처음 설치한 사람에게 시작하자마자
+   * 오류 팝업을 띄우는 대신, 홈 화면이 이 값으로 연결 안내를 보여 준다.
+   * 설정창에서 키를 넣으면 바로 환경에 반영되므로 렌더러가 설정창을 닫을 때 다시 묻는다
+   */
+  function isProviderReady() {
+    try {
+      assertProviderReady(session);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function getInitialState() {
     // 모드 선택 메뉴에 보여줄 목록
     const permissionModes = PERMISSION_MODES.map(value => ({
@@ -452,6 +469,7 @@ export function createController({
       permissionMode: session.permissionMode ?? DEFAULT_PERMISSION_MODE,
       permissionModes,
       provider: session.provider,
+      providerReady: isProviderReady(),
       providers: PROVIDERS,
       reasoningEffort: getReasoningEffort(),
       reasoningEfforts: REASONING_EFFORT_OPTIONS,
@@ -2156,10 +2174,6 @@ export function createController({
   async function startup() {
     refreshContextWindow();
 
-    // 키가 없으면 첫 턴이 원인을 알 수 없는 오류로 죽는다. 무엇이 없고 어디서
-    // 넣는지를 먼저 알린다
-    if (startupNotice) setAlert(startupNotice);
-
     if (session.noMemory) return;
 
     // 시작 알림은 homeOnly로 표시 — 홈 화면에만 보이고 채팅 화면에서는 걸러짐
@@ -2199,6 +2213,7 @@ export function createController({
     getPreferences,
     getSessionList,
     interjectNow,
+    isProviderReady,
     listBranches,
     listModels,
     listWorktreeEntries,

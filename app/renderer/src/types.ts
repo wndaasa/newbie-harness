@@ -87,6 +87,8 @@ export type InitialState = {
   permissionMode: string;
   permissionModes: PermissionModeEntry[];
   provider: string;
+  /** 지금 제공자에 키·주소가 있어 대화할 수 있는가. false면 홈 화면에 연결 안내를 띄운다 */
+  providerReady: boolean;
   providers: string[];
   /** 현재 추론 강도. 강도가 의미 없는 제공자·모델이면 null (칩 숨김) */
   reasoningEffort: string | null;
@@ -338,6 +340,7 @@ export type NewbieBridge = {
   savePreferences(patch: Partial<Preferences>): Promise<Preferences>;
   credentials(): Promise<CredentialState>;
   saveCredentials(patch: Record<string, string>): Promise<CredentialState>;
+  providerReady(): Promise<boolean>;
   /** 설정창 전용 — 지금 세션이 아니라 지정한 제공자의 모델 목록 */
   providerModels(provider: string): Promise<ModelListResult>;
   models(): Promise<ModelListResult>;

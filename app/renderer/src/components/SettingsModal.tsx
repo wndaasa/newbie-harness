@@ -180,11 +180,18 @@ const NO_GUARD: SaveGuard = { dirty: false, save: async () => true };
  * 프롬프트로 들어간다. 테마만 렌더러 localStorage에 남는데, 첫 페인트 전에
  * 정해져야 팔레트가 번쩍이지 않기 때문이다.
  */
-export function SettingsModal({ onClose }: { onClose: () => void }) {
+export function SettingsModal({
+  initialTab = 'general',
+  onClose,
+}: {
+  /** 처음 보여 줄 탭. 홈 화면의 연결 안내는 제공자 탭을 연다 */
+  initialTab?: TabId;
+  onClose: () => void;
+}) {
   // styles.css의 .settings-overlay 배경과 같은 값이어야 OS 타이틀바가 막과 이어진다
   const shade = useOverlayTitlebarColors(20, 18, 28, 0.82);
   useTitlebarShade(shade.color, shade.symbolColor);
-  const [tab, setTab] = useState<TabId>('general');
+  const [tab, setTab] = useState<TabId>(initialTab);
   const guard = useRef<SaveGuard>(NO_GUARD);
   // 좌측 맨 아래에 지금 쓰는 버전을 보인다. 업데이트를 받았는지, 어떤 빌드로 겪은
   // 문제인지 확인할 곳이 없었다

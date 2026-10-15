@@ -205,6 +205,7 @@ function createWindow(session: Session, startupNotice?: string) {
   // 자격 증명은 세션이 아니라 프로세스 환경에 얹히므로 controller를 거치지 않는다
   handle('newbie:credentials', () => readCredentialState());
   handle('newbie:save-credentials', (_event, patch) => saveCredentials(patch));
+  handle('newbie:provider-ready', () => controller.isProviderReady());
   // 업데이트는 확인만 자동이고 받기·설치는 사이드바에서 눌러야 진행된다 (updater.ts)
   handle('newbie:update-state', () => getUpdateState());
   // 설정창 좌측 아래의 버전 표시

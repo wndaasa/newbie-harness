@@ -32,14 +32,19 @@ export function HomeHero({
   chat,
   hasSessions,
   notices,
+  onOpenProviderSettings,
   onSubmit,
+  providerReady,
 }: {
   /** 채팅 탭인가. 시작 칩과 안내 문구가 달라진다 */
   chat: boolean;
   hasSessions: boolean;
   /** 시작 루틴(recall·distill)이 남긴 system 행 내용 — 히어로 아래에 작게 표시 */
   notices: string[];
+  onOpenProviderSettings: () => void;
   onSubmit: (text: string) => void;
+  /** false면 시작 칩 대신 모델 연결 안내를 보인다. 처음 설치한 사람이 가장 먼저 할 일이다 */
+  providerReady: boolean;
 }) {
   const greeting = greetingForHour(new Date().getHours());
   const subline = hasSessions
@@ -52,18 +57,30 @@ export function HomeHero({
       <pre className="home-hero-mascot">{NEWBIE_MASCOT_LINES.join('\n')}</pre>
       <h1 className="home-hero-greeting">{greeting}</h1>
       <p className="home-hero-subline">{subline}</p>
-      <div className="home-hero-chips">
-        {chips.map(chip => (
-          <button
-            className="home-hero-chip"
-            key={chip}
-            onClick={() => onSubmit(chip)}
-            type="button"
-          >
-            {chip}
+      {providerReady ? (
+        <div className="home-hero-chips">
+          {chips.map(chip => (
+            <button
+              className="home-hero-chip"
+              key={chip}
+              onClick={() => onSubmit(chip)}
+              type="button"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="home-hero-setup">
+          <p className="home-hero-setup-title">대화를 시작하려면 모델을 연결해 주세요</p>
+          <p className="home-hero-setup-body">
+            OpenAI나 Anthropic API 키, 또는 Ollama 같은 로컬 모델 중 하나만 있으면 됩니다.
+          </p>
+          <button className="home-hero-setup-action" onClick={onOpenProviderSettings} type="button">
+            설정 열기
           </button>
-        ))}
-      </div>
+        </div>
+      )}
       {notices.length > 0 && (
         <div className="home-hero-notices">
           {notices.map((notice, index) => (
