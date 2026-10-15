@@ -15,6 +15,7 @@ import type {
   ApprovalRequest,
   GitDiffSummary,
   InitialState,
+  ReasoningEffortEntry,
   TokenUsage,
   TranscriptRow,
   WorkspaceInfo,
@@ -46,6 +47,19 @@ const MAX_ATTACHED_IMAGES = 4;
 const ATTACH_ACCEPT = 'image/*,.hwp,.hwpx,.pdf,.xlsx,.xls,.docx,.txt,.md,.csv,.json';
 /** 화면 분할: 세션을 칸으로 끌어다 놓을 때 dataTransfer에 싣는 형식 */
 const DRAG_MIME = 'application/x-newbie-session';
+
+/*
+ * 제공자가 실제로 구분하는 추론 강도만 메뉴에 둔다 (main의 effortForProvider와 짝).
+ * Anthropic은 모델마다 생각을 끄는 규칙이 달라 "끔"을 받지 않고, llama.cpp는
+ * 켜고 끄는 것만 된다
+ */
+function effortsForProvider(provider: string, efforts: ReasoningEffortEntry[]) {
+  if (provider === 'anthropic') return efforts.filter(entry => entry.value !== 'none');
+  if (provider === 'llamacpp') {
+    return efforts.filter(entry => entry.value === 'none' || entry.value === 'medium');
+  }
+  return efforts;
+}
 
 /**
  * 화면 분할의 한 칸. 자기 세션의 대화·입력만 담당한다. 상태는 App이 sessionId로
@@ -121,6 +135,7 @@ export function Pane({
   const reasoningEffort = state.sessionMeta
     ? state.sessionMeta.reasoningEffort
     : initial.reasoningEffort;
+  const efforts = effortsForProvider(provider, initial.reasoningEfforts);
 
   return (
     <div className={`pane-inner${chatLanding ? ' chat-landing' : ''}`}>
@@ -215,7 +230,7 @@ export function Pane({
                     {reasoningEffort !== null && (
                       <EffortChip
                         effort={reasoningEffort}
-                        efforts={initial.reasoningEfforts}
+                        efforts={efforts}
                         onSelect={onSetReasoningEffort}
                       />
                     )}
@@ -253,7 +268,7 @@ export function Pane({
               paneTab === 'chat' && (
                 <ModelChip
                   effort={reasoningEffort}
-                  efforts={initial.reasoningEfforts}
+                  efforts={efforts}
                   model={model}
                   onSelectEffort={onSetReasoningEffort}
                   onSelectProvider={onSetProvider}

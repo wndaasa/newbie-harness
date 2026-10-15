@@ -20,6 +20,27 @@ export function resolveReasoningEffort(raw: string | undefined): string {
   return REASONING_EFFORTS.has(value) ? value : DEFAULT_REASONING_EFFORT;
 }
 
+/**
+ * 저장된 추론 강도를 제공자가 받는 값으로 맞춘다. 강도는 세션에 하나만 저장되므로
+ * OpenAI에서 고른 값이 제공자를 바꾼 뒤에도 남는다. 그 값을 그대로 보내면 400이 난다.
+ *
+ * - Anthropic: 생각을 끄는 방법이 모델마다 달라서(Opus 5.5는 끌 수 없음) "끔"을 받지
+ *   않고 가장 낮은 단계로 보낸다. xhigh는 Opus 4.7 이후만 받아 high로 낮춘다
+ * - Ollama: 단계 이름은 모델이 정한다(gpt-oss는 low·medium·high). 모르는 이름은
+ *   모델 기본값으로 처리되므로 이 셋으로 맞춰 보낸다
+ * - llama.cpp: 채팅 템플릿의 enable_thinking으로 켜고 끄는 것만 된다
+ */
+export function effortForProvider(provider: string, raw: string | undefined): string {
+  const effort = resolveReasoningEffort(raw);
+  if (provider === 'anthropic' || provider === 'ollama') {
+    if (effort === 'minimal') return 'low';
+    if (effort === 'xhigh') return 'high';
+    if (provider === 'anthropic' && effort === 'none') return 'low';
+  }
+  if (provider === 'llamacpp') return effort === 'none' ? 'none' : 'medium';
+  return effort;
+}
+
 export function isReasoningEffort(value: unknown): value is string {
   return typeof value === 'string' && REASONING_EFFORTS.has(value);
 }

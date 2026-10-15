@@ -22,6 +22,7 @@ import { toOpenAIMessages } from './images.ts';
 import { readOpenAIStream } from './streams.ts';
 import { fetchWithRetry } from './fetchWithRetry.ts';
 import { llamaSampling } from './sampling.ts';
+import { effortForProvider } from './openaiResponses.ts';
 import type { StreamResult } from './streams.ts';
 import { type ProviderContext, type ProviderRequest } from './types.ts';
 
@@ -43,7 +44,15 @@ export function llamaCppBaseUrl(): string {
 }
 
 export async function runLlamaCppTurn(
-  { model, maxTokens, messages, noReasoning, systemPrompt = SYSTEM_PROMPT, tools }: ProviderRequest,
+  {
+    model,
+    maxTokens,
+    messages,
+    noReasoning,
+    reasoningEffort,
+    systemPrompt = SYSTEM_PROMPT,
+    tools,
+  }: ProviderRequest,
   { onRetry, output, signal }: ProviderContext,
 ): Promise<StreamResult> {
   const response = await fetchWithRetry(`${llamaCppBaseUrl()}${LLAMACPP_CHAT_PATH}`, {
@@ -71,7 +80,10 @@ export async function runLlamaCppTurn(
       // Qwen3-30B-A3B-Thinking-2507)은 템플릿에 이 변수가 아예 없어 조용히
       // 무시되고 — 붙여도 해는 없지만 — 제목이 계속 비게 된다. 그런 모델을 쓸
       // 거라면 보조 호출만 받을 작은 하이브리드 모델을 따로 띄워야 한다.
-      ...(noReasoning ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+      // 사용자가 추론 강도를 "끔"으로 고른 대화 턴도 같은 방식으로 끈다
+      ...(noReasoning || effortForProvider('llamacpp', reasoningEffort) === 'none'
+        ? { chat_template_kwargs: { enable_thinking: false } }
+        : {}),
       ...llamaSampling(),
       ...(tools?.length ? { tools } : {}),
     }),

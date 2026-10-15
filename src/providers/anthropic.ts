@@ -3,6 +3,7 @@ import { toAnthropicMessages } from './images.ts';
 import { readAnthropicStream } from './streams.ts';
 import { fetchWithRetry } from './fetchWithRetry.ts';
 import { anthropicSampling } from './sampling.ts';
+import { effortForProvider } from './openaiResponses.ts';
 import type { StreamResult } from './streams.ts';
 import {
   ENV_CONTEXT_MARKER,
@@ -86,8 +87,41 @@ function isEnvContext(message: AnthropicMessage | undefined): boolean {
   );
 }
 
+/**
+ * output_config.effort를 받는 모델인가. Opus 4.5 이후, Sonnet 4.6 이후, Haiku 5 이후,
+ * Fable·Mythos만 받고 Haiku 4.5·Sonnet 4.5 이전 모델은 이 필드에 400을 낸다
+ */
+export function supportsAnthropicEffort(model: string): boolean {
+  return /^claude-(opus-4-[5-9]|sonnet-4-[6-9]|(opus|sonnet|haiku)-([5-9]|\d{2,})|fable-|mythos-)/.test(
+    model,
+  );
+}
+
+/**
+ * 추론 강도. 보내지 않으면 모델 기본값으로 돈다(Haiku 5.5는 medium, Sonnet 5는 high).
+ * 제목 생성 같은 짧은 보조 호출은 가장 낮게 둔다. 생각에 쓴 토큰도 작은 max_tokens에서
+ * 빠져 본문이 비거나 잘린다
+ */
+export function anthropicEffort(
+  model: string,
+  noReasoning: boolean | undefined,
+  reasoningEffort: string | undefined,
+): Record<string, unknown> {
+  if (!supportsAnthropicEffort(model)) return {};
+  const effort = noReasoning ? 'low' : effortForProvider('anthropic', reasoningEffort);
+  return { output_config: { effort } };
+}
+
 export async function runAnthropicTurn(
-  { model, maxTokens, messages, systemPrompt = SYSTEM_PROMPT, tools }: ProviderRequest,
+  {
+    model,
+    maxTokens,
+    messages,
+    noReasoning,
+    reasoningEffort,
+    systemPrompt = SYSTEM_PROMPT,
+    tools,
+  }: ProviderRequest,
   { onRetry, output, signal }: ProviderContext,
 ): Promise<StreamResult> {
   const response = await fetchWithRetry(ANTHROPIC_API_URL, {
@@ -104,6 +138,7 @@ export async function runAnthropicTurn(
       system: cacheableSystem(systemPrompt),
       messages: withHistoryCache(toAnthropicMessages(messages)),
       ...anthropicSampling(),
+      ...anthropicEffort(model, noReasoning, reasoningEffort),
       ...(tools?.length ? { tools: withToolCache(tools) } : {}),
     }),
   }, { label: 'Anthropic', onRetry, signal });

@@ -30,7 +30,10 @@ export type ProviderRequest = {
    * 중간에 잘린다 (제목이 "코드 실행 및 실"로 끊긴 실측 사례).
    */
   noReasoning?: boolean;
-  /** 추론 강도. 없으면 OPENAI_REASONING_EFFORT → 기본값 순으로 정한다 */
+  /**
+   * 추론 강도. 없으면 OpenAI는 OPENAI_REASONING_EFFORT → 기본값, 나머지는 기본값을 쓴다.
+   * 제공자마다 받는 값은 effortForProvider가 맞춘다
+   */
   reasoningEffort?: string;
   systemPrompt?: string;
   tools?: unknown[];

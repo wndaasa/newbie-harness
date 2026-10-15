@@ -67,12 +67,14 @@ import {
 } from '../../src/providers/contextBreakdown.ts';
 import type { TurnInputs } from '../../src/providers/contextBreakdown.ts';
 import { classifyProviderError } from '../../src/providers/errorInfo.ts';
+import { supportsAnthropicEffort } from '../../src/providers/anthropic.ts';
 import { listProviderModels } from '../../src/providers/models.ts';
 import { isReasoningModel } from '../../src/providers/openai.ts';
 import type { AgentReport, BlockedCall, Interjection } from '../../src/agent/loop.ts';
 import {
   DEFAULT_REASONING_EFFORT,
   REASONING_EFFORT_OPTIONS,
+  effortForProvider,
   isReasoningEffort,
 } from '../../src/providers/openaiResponses.ts';
 import {
@@ -703,9 +705,13 @@ export function createController({
   function reasoningEffortOf(target: Session): string | null {
     const applies =
       target.provider === 'vllm' ||
+      target.provider === 'ollama' ||
+      target.provider === 'llamacpp' ||
+      (target.provider === 'anthropic' && supportsAnthropicEffort(target.model)) ||
       (target.provider === 'openai' && isReasoningModel(target.model));
     if (!applies) return null;
-    return target.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
+    // 칩에는 실제로 보내는 값을 보인다. OpenAI에서 고른 "끔"이 Anthropic에서는 낮음으로 간다
+    return effortForProvider(target.provider, target.reasoningEffort ?? DEFAULT_REASONING_EFFORT);
   }
 
   function getReasoningEffort(): string | null {
