@@ -445,26 +445,46 @@ button > .icon:only-child {
   font-weight: 600;
 }
 
-/* 사이드바 브랜드 — 마스코트 + 앱 이름 */
+/* 사이드바 브랜드 — 마스코트 */
 .sidebar-brand {
   align-items: center;
   display: flex;
-  gap: 8px;
   padding: 2px 8px 10px;
 }
 
+/*
+ * 말하는 이미지(401x240)는 기본 이미지(258x223)의 왼쪽 위에 말풍선만 덧붙인 것이라
+ * 둘 다 좌우 반전해 왼쪽 아래에 붙이면 캐릭터 위치는 그대로이고 말풍선은 빈 오른쪽에 뜬다.
+ * 칸은 말풍선까지 들어갈 크기로 늘 잡아 둔다
+ */
 .sidebar-mascot {
   flex-shrink: 0;
-  /* 원본 258x210 비율에 맞는 정수 크기 — 소수점 폭으로 찌그러져 보이는 것 방지 */
-  height: 26px;
-  object-fit: contain;
-  width: 32px;
+  height: 28px;
+  position: relative;
+  width: 47px;
 }
 
-.sidebar-brand-name {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
+.sidebar-mascot img {
+  bottom: 0;
+  height: 26px;
+  left: 0;
+  position: absolute;
+  transform: scaleX(-1);
+  width: 30px;
+}
+
+.sidebar-mascot img.talking {
+  height: 28px;
+  width: 47px;
+}
+
+.sidebar-mascot-dark,
+:root[data-theme='dark'] .sidebar-mascot-light {
+  display: none;
+}
+
+:root[data-theme='dark'] .sidebar-mascot-dark {
+  display: block;
 }
 
 /* 평소엔 텍스트만, 호버할 때만 배경이 드러남 — 색은 목록 제목(대화)과 동일 톤 */

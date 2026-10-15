@@ -282,6 +282,8 @@ export function App() {
   }, [refreshSessions, refreshDiff, updatePane]);
 
   const focusedState = focusedSessionId ? paneStates[focusedSessionId] : undefined;
+  // 사이드바 마스코트는 화면 분할 중 어느 칸이든 돌고 있으면 말하는 모습이 된다
+  const anyPaneBusy = panes.some(pane => paneStates[pane.sessionId]?.busy);
 
   // 보조 에이전트 패널·diff는 전역이라 포커스된 칸의 대화를 기준으로 본다
   const focusedRows = focusedState?.rows ?? EMPTY_ROWS;
@@ -813,6 +815,7 @@ export function App() {
               onUpdateAction={onUpdateAction}
               sessions={tabSessions}
               tabMode={tabMode}
+              talking={anyPaneBusy}
               update={update}
               width={sidebarWidth}
             />

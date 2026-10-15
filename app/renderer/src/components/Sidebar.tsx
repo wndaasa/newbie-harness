@@ -1,7 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { IconCode, IconMessage, IconMore, IconSettings } from './Icon.tsx';
 import { UpdateRow } from './UpdateRow.tsx';
-import mascotUrl from '../../../assets/Newbie_mascot.png';
+import chatDark00Url from '../../../assets/Newbie_chat_00_dark.png';
+import chatLight00Url from '../../../assets/Newbie_chat_00_light.png';
+import chatDark01Url from '../../../assets/Newbie_chat_01_dark.png';
+import chatLight01Url from '../../../assets/Newbie_chat_01_light.png';
+import mascotDarkUrl from '../../../assets/Newbie_mascot_dark.png';
+import mascotLightUrl from '../../../assets/Newbie_mascot_light.png';
 import type { SessionSummary, TabMode, UpdateState } from '../types.ts';
 
 /*
@@ -22,6 +27,13 @@ type SessionView = {
   /** 마지막 채팅 시각(modified) 기준 정렬 방향 — 최신순/오래된순 */
   sortBy: 'recent' | 'oldest';
 };
+
+// 응답 중 마스코트: 입 모양만 다른 두 장을 번갈아 보여 말하는 것처럼 보이게 한다
+const MASCOT_CHAT_FRAMES = {
+  light: [chatLight00Url, chatLight01Url],
+  dark: [chatDark00Url, chatDark01Url],
+};
+const MASCOT_FRAME_MS = 400;
 
 const SESSION_VIEW_KEY = 'newbie.sessionView';
 const DEFAULT_SESSION_VIEW: SessionView = { project: 'all', groupBy: 'date', sortBy: 'recent' };
@@ -104,6 +116,7 @@ export function Sidebar({
   onUpdateAction,
   sessions,
   tabMode,
+  talking = false,
   update,
   width,
 }: {
@@ -123,6 +136,8 @@ export function Sidebar({
   onUpdateAction?: () => void;
   sessions: SessionSummary[];
   tabMode: TabMode;
+  /** 열린 칸 중 하나라도 에이전트가 돌고 있음 — 마스코트가 말하는 모습이 된다 */
+  talking?: boolean;
   update?: UpdateState;
   width: number;
 }) {
@@ -135,6 +150,15 @@ export function Sidebar({
   const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null);
   const [view, setView] = useState<SessionView>(loadSessionView);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsedGroups);
+  const [mascotFrame, setMascotFrame] = useState(0);
+
+  // 응답 중에만 타이머를 돌린다. 움직임 줄이기 설정이면 첫 장에 멈춰 둔다
+  useEffect(() => {
+    setMascotFrame(0);
+    if (!talking || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = setInterval(() => setMascotFrame(frame => 1 - frame), MASCOT_FRAME_MS);
+    return () => clearInterval(timer);
+  }, [talking]);
 
   function toggleGroup(key: string) {
     setCollapsed(previous => {
@@ -289,8 +313,19 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-brand">
-        <img alt="Newbie 마스코트" className="sidebar-mascot" src={mascotUrl} />
-        <span className="sidebar-brand-name">Newbie</span>
+        <span aria-label="Newbie 마스코트" className="sidebar-mascot" role="img">
+          {/* 테마별 두 장을 다 두고 CSS가 data-theme에 맞는 쪽만 보여준다 */}
+          <img
+            alt=""
+            className={`sidebar-mascot-light${talking ? ' talking' : ''}`}
+            src={talking ? MASCOT_CHAT_FRAMES.light[mascotFrame] : mascotLightUrl}
+          />
+          <img
+            alt=""
+            className={`sidebar-mascot-dark${talking ? ' talking' : ''}`}
+            src={talking ? MASCOT_CHAT_FRAMES.dark[mascotFrame] : mascotDarkUrl}
+          />
+        </span>
       </div>
 
       <button className="new-chat" onClick={onNewSession} type="button">
