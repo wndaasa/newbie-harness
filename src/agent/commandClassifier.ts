@@ -234,12 +234,29 @@ export function buildClassifierPrompt(input: {
   ].join('\n');
 }
 
-/** 분류기 출력에서 JSON 판정을 꺼냄. 해석 못 하면 판정 없음 (실행하지 않는다, fail-closed) */
-export function parseVerdict(raw: string): CommandVerdict {
-  const match = /\{[\s\S]*?\}/.exec(String(raw ?? ''));
-  if (match) {
+/** 해석 실패 사유에 붙이는 응답 원문 길이 */
+const RAW_EXCERPT_CHARS = 120;
+
+/**
+ * 분류기 출력에서 JSON 판정을 꺼냄. 해석 못 하면 판정 없음 (실행하지 않는다, fail-closed).
+ *
+ * 예전에는 첫 '{'부터 가장 가까운 '}'까지만 JSON으로 읽어서, 사유에 '}'가 든 판정
+ * (명령의 스크립트 블록을 인용한 경우)은 중간에서 잘려 해석에 실패했다. 첫 '{'부터
+ * 마지막 '}'까지를 먼저 시도하고, 코드 펜스(```json)는 걷어낸다.
+ * 사유가 출력 상한에 걸려 잘린 경우처럼 JSON이 끝나지 않았으면 "allow" 값만 읽는다.
+ * 서로 다른 값이 둘 이상 보이면 어느 쪽인지 알 수 없으므로 판정 없음으로 둔다
+ */
+export function parseVerdict(raw: string, stopReason?: string): CommandVerdict {
+  const text = String(raw ?? '').replace(/```(?:json)?/gi, '').trim();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  const candidates = start >= 0 && end > start ? [text.slice(start, end + 1)] : [];
+  const lazy = /\{[\s\S]*?\}/.exec(text);
+  if (lazy && lazy[0] !== candidates[0]) candidates.push(lazy[0]);
+
+  for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(match[0]);
+      const parsed = JSON.parse(candidate);
       if (typeof parsed.allow === 'boolean') {
         return {
           allow: parsed.allow,
@@ -247,10 +264,42 @@ export function parseVerdict(raw: string): CommandVerdict {
         };
       }
     } catch {
-      // 아래 폴백으로
+      // 다음 후보로
     }
   }
-  return { allow: false, reason: '분류기 응답을 해석하지 못했습니다.', unavailable: true };
+
+  // 끝나지 않은 JSON에서 값만 줍는 것은 출력 상한에 걸려 잘린 게 확실할 때만이다.
+  // 그 밖의 깨진 출력은 무엇이 왜 깨졌는지 모르므로 판정 없음으로 둔다 (fail-closed)
+  const values =
+    stopReason === 'length'
+      ? new Set([...text.matchAll(/"allow"\s*:\s*(true|false)/g)].map(match => match[1]))
+      : new Set<string>();
+  if (values.size === 1) {
+    const reason = /"reason"\s*:\s*"([^"]*)/.exec(text)?.[1]?.trim();
+    return {
+      allow: values.has('true'),
+      reason: reason ? `${reason} (응답이 잘려 사유 일부만 읽었습니다)` : '분류기가 사유를 끝맺지 못했습니다.',
+    };
+  }
+
+  return {
+    allow: false,
+    reason: describeUnparsed(text, stopReason),
+    unavailable: true,
+  };
+}
+
+/** 해석하지 못한 응답의 원인을 짐작할 수 있게 종료 사유와 앞부분을 붙인다 */
+function describeUnparsed(text: string, stopReason: string | undefined): string {
+  const cause = !text
+    ? stopReason === 'length'
+      ? '출력 상한에 걸려 본문 없이 끝났습니다'
+      : '빈 응답이 왔습니다'
+    : stopReason === 'length'
+      ? '출력 상한에 걸려 응답이 잘렸습니다'
+      : '응답이 판정 형식이 아닙니다';
+  const excerpt = text.replace(/\s+/g, ' ').slice(0, RAW_EXCERPT_CHARS);
+  return `분류기 응답을 해석하지 못했습니다 (${cause}${excerpt ? `: "${excerpt}${text.length > RAW_EXCERPT_CHARS ? '…' : ''}"` : ''}).`;
 }
 
 /**
@@ -258,6 +307,9 @@ export function parseVerdict(raw: string): CommandVerdict {
  * 프로바이더의 무응답 감시(기본 5분)까지 기다리면 그동안 턴 전체가 멈춰 있다
  */
 const CLASSIFIER_TIMEOUT_MS = 30_000;
+
+/** 판정 한 번의 출력 상한 (생각 토큰 포함). 위 classifyCommand의 주석 참고 */
+const CLASSIFIER_MAX_TOKENS = 1_024;
 
 /** 허용목록 밖 셸 명령의 자동 실행 가부를 LLM으로 판정 */
 export async function classifyCommand(
@@ -275,11 +327,19 @@ export async function classifyCommand(
   signal?: AbortSignal,
 ): Promise<CommandVerdict> {
   const timeout = AbortSignal.timeout(CLASSIFIER_TIMEOUT_MS);
+  let stopReason: string | undefined;
   try {
     const raw = await runProviderText(
       { ...session, model: classifierModel(session) },
       {
-        maxTokens: 150,
+        // 판정은 JSON 한 줄이지만 상한은 넉넉히 둔다. 생각을 끌 수 없는 모델(적응형
+        // 사고)은 가장 낮은 강도에서도 생각에 토큰을 쓰고, 그 몫까지 이 상한에서
+        // 빠진다. 150이면 긴 명령을 볼 때 판정 JSON이 잘리거나 비었다. 상한일 뿐이라
+        // 실제로 생성한 만큼만 과금된다
+        maxTokens: CLASSIFIER_MAX_TOKENS,
+        onStopReason: reason => {
+          stopReason = reason;
+        },
         messages: [
           {
             content: buildClassifierPrompt({
@@ -299,7 +359,7 @@ export async function classifyCommand(
         systemPrompt: CLASSIFIER_SYSTEM_PROMPT,
       },
     );
-    return parseVerdict(raw);
+    return parseVerdict(raw, stopReason);
   } catch (error) {
     return {
       allow: false,

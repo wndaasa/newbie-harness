@@ -93,6 +93,11 @@ export async function runProviderText(
      * 때까지 붙잡고 있는다
      */
     signal?: AbortSignal;
+    /**
+     * 응답의 종료 사유를 받는다. 본문을 해석하지 못했을 때 "출력 상한에 걸려 잘렸다"
+     * 같은 원인을 함께 남기려는 용도다 (명령 분류기)
+     */
+    onStopReason?: (stopReason: string | undefined) => void;
   },
 ): Promise<string> {
   if (session.mock) return '';
@@ -114,5 +119,6 @@ export async function runProviderText(
       ...(options.tools ? { tools: options.tools } : {}),
     },
   );
+  options.onStopReason?.(result.stopReason);
   return result.text;
 }

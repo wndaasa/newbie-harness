@@ -29,6 +29,45 @@ describe('판정 해석 (fail-closed)', () => {
     expect(parseVerdict('{"reason": "?"}').allow).toBe(false);
     expect(parseVerdict('알겠습니다, 실행해도 됩니다').allow).toBe(false);
   });
+
+  test('사유에 }가 들어 있어도 끝까지 읽는다', () => {
+    const verdict = parseVerdict(
+      '{"allow": false, "reason": "스크립트 블록 { Invoke-WebRequest x } 안에서 외부로 보낸다"}',
+    );
+    expect(verdict.unavailable).toBeUndefined();
+    expect(verdict.allow).toBe(false);
+    expect(verdict.reason).toContain('Invoke-WebRequest');
+  });
+
+  test('코드 펜스로 감싼 JSON도 읽는다', () => {
+    const verdict = parseVerdict('```json\n{"allow": true, "reason": "로컬 빌드"}\n```');
+    expect(verdict.allow).toBe(true);
+    expect(verdict.unavailable).toBeUndefined();
+  });
+
+  test('사유가 잘려 JSON이 끝나지 않아도 allow 값 하나는 읽는다', () => {
+    const verdict = parseVerdict('{"allow": true, "reason": "로컬에서 테스트를 돌리는', 'length');
+    expect(verdict.allow).toBe(true);
+    expect(verdict.unavailable).toBeUndefined();
+    expect(verdict.reason).toContain('잘려');
+  });
+
+  test('allow 값이 서로 다르게 둘 보이면 판정 없음', () => {
+    const verdict = parseVerdict('{"allow": true, ... 아니 {"allow": false');
+    expect(verdict.allow).toBe(false);
+    expect(verdict.unavailable).toBe(true);
+  });
+
+  test('해석하지 못하면 원인과 응답 앞부분을 사유에 남긴다', () => {
+    const cut = parseVerdict('', 'length');
+    expect(cut.unavailable).toBe(true);
+    expect(cut.reason).toContain('출력 상한');
+
+    const prose = parseVerdict('이 명령은 안전해 보입니다.');
+    expect(prose.unavailable).toBe(true);
+    expect(prose.reason).toContain('판정 형식이 아닙니다');
+    expect(prose.reason).toContain('이 명령은 안전해 보입니다.');
+  });
 });
 
 describe('분류기 모델 선택', () => {
