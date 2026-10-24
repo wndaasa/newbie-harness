@@ -118,6 +118,94 @@ export function childModelFor(
   return { model, provider };
 }
 
+/**
+ * 아래 등급(fast·local)의 자식이 이 이유로 멈추면 강함 등급으로 한 번 다시 맡긴다.
+ * 작은 모델이 같은 확인을 맴돌거나(no_progress) 창이 작아 넘친(context) 것은 큰
+ * 모델로 바꾸면 풀릴 수 있다. 권한 거부(denied)·분류기 장애(classifier_down)는
+ * 모델과 무관해 다시 맡겨도 똑같이 막히므로 넘기지 않는다
+ */
+const ESCALATE_CAUSES: ReadonlySet<string> = new Set(['context', 'no_progress']);
+
+const EMPTY_REPORT =
+  '(보조 에이전트가 보고 없이 끝났습니다. 필요하면 더 구체적인 prompt로 다시 띄우세요.)';
+
+type Attempt = {
+  children: SessionToolCall[];
+  text: string;
+  /** 위 등급으로 넘길 만한 실패면 그 이유. 없으면 이 결과로 끝낸다 */
+  failure?: string;
+};
+
+/** 자식 루프 한 번. 등급이 있는 시도는 넘길 만한 실패를 던지지 않고 failure로 돌려준다 */
+async function runAttempt(
+  parentSession: Session,
+  parent: AgentLoopContext,
+  input: { callId: string; task: string },
+  options: {
+    allowTool: (name: string) => boolean;
+    depth: number;
+    systemPrompt: string;
+    tier: ModelTier | undefined;
+  },
+): Promise<Attempt> {
+  const child: Session = {
+    ...parentSession,
+    ...childModelFor(parentSession, options.tier),
+    // 부모의 접힌 자리는 부모 이력 기준이라 자식에는 맞지 않는다
+    compaction: undefined,
+    initialRows: [],
+    messages: [{ at: new Date().toISOString(), content: input.task, role: 'user' }],
+    // 자식은 언제나 코딩 도구 기준 — 채팅 탭에는 이 도구가 없어 여기 올 수 없다
+    mode: 'agent',
+    systemPrompt: undefined,
+  };
+
+  let result: Awaited<ReturnType<typeof runAgentLoop>>;
+  try {
+    result = await runAgentLoop(child, {
+      allowTool: options.allowTool,
+      // 자식의 중간 글과 추론은 화면에 흘리지 않는다. 최종 보고가 곧 이 도구의
+      // 결과라 그 자리에 보이고, 중간 도구 호출은 이벤트로 중첩돼 나간다
+      output: { write() {}, writeReasoning() {} },
+      ...(parent.confirmToolUse ? { confirmToolUse: serializedConfirm(parent.confirmToolUse) } : {}),
+      depth: options.depth,
+      // 환경 정보는 부모와 같은 값을 같은 자리(대화 맨 끝)에 붙인다
+      ...(parent.envContext ? { envContext: parent.envContext } : {}),
+      onRetry: parent.onRetry,
+      onToolEvent: event => parent.onToolEvent?.({ ...event, parentId: input.callId }),
+      signal: parent.signal,
+      systemPrompt: options.systemPrompt,
+    });
+  } catch (error) {
+    // 로컬 서버가 꺼졌거나 모델 이름이 틀린 것 같은 호출 실패. 등급이 없으면(대화
+    // 모델 그대로) 넘길 곳이 없으니 예전처럼 오류로 올린다
+    if (parent.signal?.aborted || !options.tier) throw error;
+    return { children: [], failure: `호출에 실패해서 (${(error as Error).message})`, text: '' };
+  }
+
+  const children = collectToolCalls(result.toolTurns);
+  if (parent.signal?.aborted) {
+    return { children, text: '(사용자가 중단해 보조 에이전트가 멈췄습니다.)' };
+  }
+  // 답 없이 멈춘 자식은 왜 멈췄는지를 보고로 돌려준다. 부모가 그 이유를 보고
+  // 다른 방법을 고르거나 사용자에게 넘길 수 있다
+  if (result.stop.cause !== 'done') {
+    const summary = stopSummary(result.stop);
+    return {
+      children,
+      ...(options.tier && ESCALATE_CAUSES.has(result.stop.cause)
+        ? { failure: `멈춰서 (${summary})` }
+        : {}),
+      text: `(보조 에이전트가 멈췄습니다: ${summary})`,
+    };
+  }
+  const text = result.text.trim();
+  if (!text) {
+    return { children, ...(options.tier ? { failure: '보고 없이 끝나서' } : {}), text: EMPTY_REPORT };
+  }
+  return { children, text };
+}
+
 export async function runSubagent(
   parentSession: Session,
   parent: AgentLoopContext,
@@ -128,47 +216,27 @@ export async function runSubagent(
     throw new Error('보조 에이전트는 다시 보조 에이전트를 띄울 수 없습니다. 직접 처리하세요.');
   }
 
-  const child: Session = {
-    ...parentSession,
-    ...childModelFor(parentSession, input.tier),
-    // 부모의 접힌 자리는 부모 이력 기준이라 자식에는 맞지 않는다
-    compaction: undefined,
-    initialRows: [],
-    messages: [{ at: new Date().toISOString(), content: input.task, role: 'user' }],
-    // 자식은 언제나 코딩 도구 기준 — 채팅 탭에는 이 도구가 없어 여기 올 수 없다
-    mode: 'agent',
-    systemPrompt: undefined,
-  };
-
   const allowTool = childToolFilter(input.kind);
   await acquireSlot();
   try {
-    const result = await runAgentLoop(child, {
-      allowTool,
-      // 자식의 중간 글과 추론은 화면에 흘리지 않는다. 최종 보고가 곧 이 도구의
-      // 결과라 그 자리에 보이고, 중간 도구 호출은 이벤트로 중첩돼 나간다
-      output: { write() {}, writeReasoning() {} },
-      ...(parent.confirmToolUse ? { confirmToolUse: serializedConfirm(parent.confirmToolUse) } : {}),
-      depth,
-      // 환경 정보는 부모와 같은 값을 같은 자리(대화 맨 끝)에 붙인다
-      ...(parent.envContext ? { envContext: parent.envContext } : {}),
-      onRetry: parent.onRetry,
-      onToolEvent: event => parent.onToolEvent?.({ ...event, parentId: input.callId }),
-      signal: parent.signal,
-      systemPrompt: await buildSubagentSystemPrompt(parentSession, input.kind, allowTool),
-    });
-    const children = collectToolCalls(result.toolTurns);
-    if (parent.signal?.aborted) {
-      return { children, text: '(사용자가 중단해 보조 에이전트가 멈췄습니다.)' };
+    const systemPrompt = await buildSubagentSystemPrompt(parentSession, input.kind, allowTool);
+    const options = { allowTool, depth, systemPrompt };
+    const first = await runAttempt(parentSession, parent, input, { ...options, tier: input.tier });
+    if (!first.failure || !input.tier) return { children: first.children, text: first.text };
+
+    // 아래 등급이 실패했다. 강함(대화 모델)으로 한 번만 다시 맡긴다. 등급이 이미
+    // 대화 모델로 풀렸으면(키가 없어 fast가 지금 모델로 떨어진 경우 등) 같은 모델로
+    // 되풀이할 뿐이라 넘기지 않는다
+    const lower = childModelFor(parentSession, input.tier);
+    if (lower.provider === parentSession.provider && lower.model === parentSession.model) {
+      return { children: first.children, text: first.text || EMPTY_REPORT };
     }
-    // 답 없이 멈춘 자식은 왜 멈췄는지를 보고로 돌려준다. 부모가 그 이유를 보고
-    // 다른 방법을 고르거나 사용자에게 넘길 수 있다
-    if (result.stop.cause !== 'done') {
-      return { children, text: `(보조 에이전트가 멈췄습니다: ${stopSummary(result.stop)})` };
-    }
+    const second = await runAttempt(parentSession, parent, input, { ...options, tier: undefined });
+    const notice = `(${childLabel(parentSession, input.tier)}이(가) ${first.failure} ${childLabel(parentSession, undefined)}으로 다시 맡겼습니다.)`;
     return {
-      children,
-      text: result.text.trim() || '(보조 에이전트가 보고 없이 끝났습니다. 필요하면 더 구체적인 prompt로 다시 띄우세요.)',
+      // 앞 시도의 도구 호출도 이미 화면에 중첩돼 나갔다. 저장본이 화면과 같도록 함께 남긴다
+      children: [...first.children, ...second.children],
+      text: `${notice}\n\n${second.text}`,
     };
   } finally {
     releaseSlot();
@@ -205,7 +273,8 @@ registerTool({
     'tier: 일의 난이도에 맞는 모델 등급. fast(빠르고 싼 모델 — 파일 찾기, 단순 조사, 요약처럼 판단이 적은 일),',
     'local(로컬 모델 — 비용 없이 돌릴 단순 읽기 조사. 도구 호출이 서툴 수 있어 explore에만 권장),',
     'strong(기본, 지금 대화 모델 — 설계 판단, 여러 파일에 걸친 수정, 미묘한 버그 추적).',
-    '판단이 적은 일은 fast로 내려 비용과 시간을 아끼세요. 보고가 부실하면 한 등급 올려 다시 맡기세요.',
+    '판단이 적은 일은 fast로 내려 비용과 시간을 아끼세요. fast·local이 호출 실패·맴돌기·빈 보고로 끝나면',
+    '앱이 strong으로 한 번 자동으로 다시 맡깁니다. 보고는 왔지만 내용이 부실하면 strong으로 다시 맡기세요.',
   ].join(' '),
   parameters: {
     type: 'object',

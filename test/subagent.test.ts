@@ -295,6 +295,105 @@ test('백그라운드 자식을 중단하면 보고는 aborted로 표시된다',
   expect(report.text).toContain('중단');
 });
 
+/**
+ * 자식 응답을 모델 이름으로 고른다. 위 등급으로 넘기기 테스트용 — 아래 등급 모델과
+ * 대화 모델이 서로 다른 대본을 탄다. 값이 Error면 그 호출은 던진다
+ */
+function scriptByModel(parent: any[], byModel: Record<string, any[]>) {
+  const state = { childModels: [] as string[], parentCalls: 0, perModel: {} as Record<string, number> };
+  mock.module('../src/providers/index.ts', () => ({
+    countProviderTokens: async () => null,
+    runProviderText: async () => '',
+    runProviderTurn: async (session: any, context: any) => {
+      const child = String(context.systemPrompt ?? '').includes('You are a subagent of');
+      let resp: any;
+      if (child) {
+        state.childModels.push(session.model);
+        const script = byModel[session.model] ?? [say('')];
+        const index = state.perModel[session.model] ?? 0;
+        state.perModel[session.model] = index + 1;
+        resp = script[Math.min(index, script.length - 1)];
+      } else {
+        resp = parent[Math.min(state.parentCalls++, parent.length - 1)];
+      }
+      if (resp instanceof Error) throw resp;
+      if (resp.text) context.output.write(resp.text);
+      return { usage: undefined, ...resp };
+    },
+  }));
+  return state;
+}
+
+const spawnTier = (id: string, tier: string) => ({
+  text: '',
+  toolCalls: [
+    {
+      id,
+      input: { description: '메모 파일 확인', prompt: `${target} 파일을 읽고 보고하세요.`, tier },
+      name: 'spawn_agent',
+    },
+  ],
+});
+
+async function runParent(parent: any[]) {
+  const { runAgentLoop } = await import('../src/agent/loop.ts');
+  const result = await runAgentLoop(session(), { output: { write: () => {} } });
+  return result.toolTurns.find(turn => turn.toolCalls?.length)!.toolCalls![0];
+}
+
+test('빠름 등급이 보고 없이 끝나면 대화 모델로 한 번 다시 맡기고, 두 시도의 도구 호출을 모두 남긴다', async () => {
+  const state = scriptByModel([spawnTier('call-esc-1', 'fast'), say('끝')], {
+    'gpt-5.6-luna': [
+      { text: '', toolCalls: [{ id: 'luna-read', input: { path: target }, name: 'read_file' }] },
+      say(''),
+    ],
+    'gpt-5.5': [say('note.txt에는 "hello from note"가 있습니다.')],
+  });
+  const call = await runParent([]);
+
+  // 기본값: openai의 빠름 등급은 gpt-5.6-luna, 다시 맡기는 곳은 대화 모델 gpt-5.5.
+  // luna가 몇 라운드를 도는지는 루프의 빈 응답 재촉에 달려 있어 묶지 않는다
+  expect(state.childModels[0]).toBe('gpt-5.6-luna');
+  expect(state.childModels.at(-1)).toBe('gpt-5.5');
+  expect(state.childModels.filter(model => model === 'gpt-5.5')).toHaveLength(1);
+  expect(call.result).toContain('빠름 등급(openai/gpt-5.6-luna)');
+  expect(call.result).toContain('보고 없이 끝나서');
+  expect(call.result).toContain('강함 등급(openai/gpt-5.5)');
+  expect(call.result).toContain('hello from note');
+  expect(call.children?.map(child => child.id)).toEqual(['luna-read']);
+});
+
+test('빠름 등급 호출이 실패해도 대화 모델로 다시 맡긴다', async () => {
+  const state = scriptByModel([spawnTier('call-esc-2', 'fast'), say('끝')], {
+    'gpt-5.6-luna': [new Error('model_not_found')],
+    'gpt-5.5': [say('보고서')],
+  });
+  const call = await runParent([]);
+
+  expect(state.childModels).toEqual(['gpt-5.6-luna', 'gpt-5.5']);
+  expect(call.ok).toBe(true);
+  expect(call.result).toContain('호출에 실패해서 (model_not_found)');
+  expect(call.result).toContain('보고서');
+});
+
+test('빠름 등급이 보고를 내면 넘기지 않는다', async () => {
+  const state = scriptByModel([spawnTier('call-esc-3', 'fast'), say('끝')], {
+    'gpt-5.6-luna': [say('짧은 보고')],
+  });
+  const call = await runParent([]);
+
+  expect(state.childModels).toEqual(['gpt-5.6-luna']);
+  expect(call.result).toBe('짧은 보고');
+});
+
+test('등급을 주지 않은 자식은 빈 보고여도 넘기지 않는다 (예전 동작)', async () => {
+  const state = scriptByModel([spawn('call-esc-4'), say('끝')], { 'gpt-5.5': [say('')] });
+  const call = await runParent([]);
+
+  expect(state.childModels).toEqual(['gpt-5.5']);
+  expect(call.result).toContain('보고 없이 끝났습니다');
+});
+
 test('자동 알림에 실린 보고는 다시 열 때 spawn_agent 행에 붙고, 사용자 말풍선이나 요청 목록이 되지 않는다', async () => {
   const storage = await import('../src/session/storage.ts');
   const persisted = { ...storage.createSessionPersistence(work), mock: false, mode: 'agent' } as any;
