@@ -154,16 +154,23 @@ function EffortItems({
   onPick: (value: string) => void;
   withKeys?: boolean;
 }) {
-  const selected = efforts.find(entry => entry.value === current);
+  // 설명 줄은 마우스(또는 키보드 포커스)가 올라간 단계를 따라가고, 벗어나면 고른 단계로 돌아온다
+  const [hovered, setHovered] = useState<string | null>(null);
+  const shown =
+    efforts.find(entry => entry.value === hovered) ??
+    efforts.find(entry => entry.value === current);
   return (
     <>
-      {selected && <div className="chip-menu-hint">{selected.hint}</div>}
+      {shown && <div className="chip-menu-hint">{shown.hint}</div>}
       {efforts.map((entry, index) => (
         <button
           className="chip-menu-item"
           key={entry.value}
+          onBlur={() => setHovered(null)}
           onClick={() => onPick(entry.value)}
-          title={entry.hint}
+          onFocus={() => setHovered(entry.value)}
+          onMouseEnter={() => setHovered(entry.value)}
+          onMouseLeave={() => setHovered(null)}
           type="button"
         >
           <span>{entry.label}</span>

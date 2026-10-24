@@ -1795,7 +1795,10 @@ button > .icon:only-child {
   font-size: 11px;
   line-height: 1.45;
   max-width: 230px;
+  /* 호버하면 설명이 바뀐다. 한 줄짜리 설명에서 메뉴 높이가 출렁이지 않게 두 줄 높이를 잡아 둔다 */
+  min-height: calc(11px * 1.45 * 2);
   padding: 2px 10px 8px;
+  box-sizing: content-box;
 }
 
 /* ── 칩 팝업 메뉴 ─────────────────────────────────── */
