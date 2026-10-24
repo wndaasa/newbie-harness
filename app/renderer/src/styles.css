@@ -149,15 +149,19 @@ samp {
    * generic monospace로 떨어지는데, 한국어 윈도우에서는 그게 GulimChe(비트맵
    * 계열)라 획이 울퉁불퉁하게 보였다.
    */
-  --mono: 'Cascadia Mono', Consolas, 'Pretendard Variable', 'Segoe UI Symbol',
+  --mono: 'Cascadia Mono', Consolas, 'Noto Sans KR', 'Pretendard Variable', 'Segoe UI Symbol',
     'Segoe UI Emoji', monospace;
   /*
    * 본문 글꼴. 기호 글꼴을 sans-serif 앞에 둔다 — 없으면 ◒ 같은 문자는 Noto Sans
    * KR로, ▸ 는 Cambria Math로 떨어져서 한 줄 안에서 글꼴이 갈렸다.
    * 고정폭 상자 안에서 문장을 다시 본문 글꼴로 돌릴 때도 이 값을 쓴다.
    */
-  --sans: 'Pretendard Variable', 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic',
-    'Segoe UI Symbol', 'Segoe UI Emoji', sans-serif;
+  /*
+   * Noto Sans KR을 1순위로 쓴다. 앱에 싣지 않고 OS에 설치된 글꼴을 쓰므로(Windows 11은
+   * 한국어 글꼴 팩에 들어 있다), 없는 PC에서는 앱에 실린 Pretendard로 떨어진다
+   */
+  --sans: 'Noto Sans KR', 'Pretendard Variable', 'Segoe UI Variable Text', 'Segoe UI',
+    'Malgun Gothic', 'Segoe UI Symbol', 'Segoe UI Emoji', sans-serif;
   /*
    * 모서리 라운드. 예전에는 13종류(999px·18·16·14·12·10·8·6·5·4·2px 등)가
    * 흩어져 있어서, 같은 줄에 선 칩과 입력창의 둥근 정도가 제각각이었다.
@@ -184,8 +188,6 @@ samp {
   --pad-chip: 4px 12px; /*    상태 칩 */
   --pad-badge: 2px 6px; /*    글줄 안에 박히는 작은 표식 */
   --sidebar-width: 280px;
-  /* body의 글자 외곽선 굵기 */
-  --text-stroke: 0.25px;
 }
 
 /* 다크 팔레트 — 무채색 회색 기반.
@@ -266,11 +268,19 @@ body {
   word-break: keep-all;
   overflow-wrap: anywhere;
   /*
-   * 글자 외곽선. Windows의 글꼴 렌더링에서 Pretendard 400이 흰 배경 위에 가늘고
-   * 흐리게 보였다. 같은 색의 얇은 외곽선을 둘러 획을 또렷하게 한다.
-   * 굵기를 한 단계 올리는 것보다 자간이 덜 뭉친다. 0이면 끈다
+   * 본문 굵기. Windows의 글꼴 렌더링에서 400은 흰 배경 위에 가늘고 흐리게 보였다.
+   * 한때 0.25px 외곽선(-webkit-text-stroke)으로 획을 덧칠했는데, 11px 안팎의 작은
+   * 글자에서는 획 사이 틈이 메워져 '뷁'·'똠' 같은 글자가 뭉개졌고, 드래그로 고르면
+   * 흰 글자에 어두운 테가 남아 번져 보였다. 가변 글꼴의 굵기를 반 단계 올리면
+   * 획 모양을 그대로 둔 채 진해진다 (Noto Sans KR·Pretendard 모두 가변 글꼴)
    */
-  -webkit-text-stroke: var(--text-stroke) currentColor;
+  font-weight: 450;
+}
+
+/* 드래그로 고른 글자. 브라우저 기본 선택색 대신 강조색 위 흰 글자로, 불투명하게 */
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* 아이콘은 글자 옆에 서므로 baseline이 아니라 가운데로 맞춘다.
@@ -1626,10 +1636,10 @@ button > .icon:only-child {
   text-overflow: ellipsis;
 }
 
-/* 채팅 탭 통합 칩의 노력 표시 — 모델 이름보다 한 단계 더 흐리게 */
+/* 채팅 탭 통합 칩의 노력 표시 — 반투명 대신 흐린 글자색으로 구분한다 */
 .status-model-effort {
+  color: var(--text-dim);
   flex-shrink: 0;
-  opacity: 0.75;
 }
 
 /* ── 상자 아래 상태 줄 (코딩 탭) ──────────────────── */
@@ -1925,7 +1935,6 @@ button > .icon:only-child {
   font-family: var(--mono);
   font-size: 11.5px;
   gap: 8px;
-  opacity: 0.75;
 }
 
 /* 메뉴 항목 오른쪽의 현재 값 (한글 포함이라 기본 폰트 사용) */
@@ -2047,8 +2056,9 @@ button > .icon:only-child {
 }
 
 .chip-menu-input button:disabled {
+  background: var(--bg-active);
+  color: var(--text-dim);
   cursor: default;
-  opacity: 0.5;
 }
 
 /* 워크트리 칩 메뉴: 목록 행·제거 버튼·base override 컨트롤 */
@@ -2079,8 +2089,9 @@ button > .icon:only-child {
 }
 
 .worktree-remove:disabled {
+  border-color: var(--border);
+  color: var(--text-dim);
   cursor: default;
-  opacity: 0.5;
 }
 
 .worktree-base-toggle {
@@ -3219,7 +3230,6 @@ button > .icon:only-child {
 
 .diff-line-no {
   color: var(--text-dim);
-  opacity: 0.7;
   padding-right: 8px;
   text-align: right;
   user-select: none;
@@ -3353,7 +3363,6 @@ button > .icon:only-child {
   font-size: 10.5px;
   letter-spacing: 0.06em;
   margin-bottom: 2px;
-  opacity: 0.7;
   text-transform: uppercase;
 }
 
@@ -3363,7 +3372,7 @@ button > .icon:only-child {
 }
 
 .term-empty {
-  opacity: 0.6;
+  color: var(--text-dim);
 }
 
 /* 명령이 아닌 도구의 머리: 인자를 "이름 값" 칩으로 */
@@ -3907,7 +3916,6 @@ button > .icon:only-child {
 
 .approval-reason {
   margin-top: 4px;
-  opacity: 0.85;
 }
 
 /* 승인 전에 실제 내용을 확인할 수 있도록. 긴 페이로드는 자체 스크롤로 가둔다 */
