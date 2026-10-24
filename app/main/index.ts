@@ -202,6 +202,8 @@ function createWindow(session: Session, startupNotice?: string) {
   handle('newbie:save-preferences', (_event, patch) =>
     controller.savePreferences(patch),
   );
+  handle('newbie:model-tiers', () => controller.getModelTiers());
+  handle('newbie:save-model-tiers', (_event, patch) => controller.saveModelTiers(patch));
   // 자격 증명은 세션이 아니라 프로세스 환경에 얹히므로 controller를 거치지 않는다
   handle('newbie:credentials', () => readCredentialState());
   handle('newbie:save-credentials', (_event, patch) => saveCredentials(patch));

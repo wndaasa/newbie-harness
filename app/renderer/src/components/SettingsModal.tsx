@@ -12,6 +12,8 @@ import type {
   CredentialState,
   McpServerRow,
   McpState,
+  ModelTier,
+  ModelTierState,
   PetAnimation,
   PetAnimationSlot,
   PetSettings,
@@ -155,6 +157,7 @@ const SAMPLING_KEYS = [
 const TABS = [
   { id: 'general', label: '일반' },
   { id: 'provider', label: '제공자' },
+  { id: 'tiers', label: '모델 등급' },
   { id: 'mcp', label: 'MCP' },
   { id: 'pet', label: '펫' },
 ] as const;
@@ -287,6 +290,7 @@ export function SettingsModal({
           <div className="settings-body">
             {tab === 'general' && <GeneralTab />}
             {tab === 'provider' && <ProviderTab guard={guard} />}
+            {tab === 'tiers' && <ModelTiersTab />}
             {tab === 'mcp' && <McpTab />}
             {tab === 'pet' && <PetTab />}
           </div>
@@ -410,6 +414,105 @@ function ThemeSection() {
           ))}
         </div>
       </SettingsRow>
+    </section>
+  );
+}
+
+// ── 모델 등급: 보조 에이전트가 쓸 모델 ─────────────────────────────
+
+const TIER_ROWS: { tier: ModelTier; label: string; hint: string }[] = [
+  { tier: 'fast', label: '빠름', hint: '파일 찾기, 단순 조사, 요약처럼 판단이 적은 일' },
+  { tier: 'local', label: '로컬', hint: '비용 없이 돌릴 단순 읽기 조사' },
+  { tier: 'strong', label: '강함', hint: '설계 판단, 여러 파일 수정. 비우면 지금 대화 모델' },
+];
+
+/**
+ * 대화 모델이 보조 에이전트(spawn_agent)를 띄울 때 일의 크기에 맞춰 등급을 고른다.
+ * 여기서는 등급마다 쓸 제공자·모델을 정한다. 칸을 비우면 기본값을 쓰고, 그 기본값이
+ * 지금 무엇으로 풀리는지 안내 줄에 보인다. 입력 칸을 벗어날 때 저장한다(프로필과 같다)
+ */
+function ModelTiersTab() {
+  const [state, setState] = useState<ModelTierState | null>(null);
+  const [drafts, setDrafts] = useState<ModelTierState['settings'] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void window.newbie.modelTiers().then(next => {
+      if (!alive) return;
+      setState(next);
+      setDrafts(next.settings);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function update(tier: ModelTier, field: 'provider' | 'model', value: string) {
+    setDrafts(previous => (previous ? { ...previous, [tier]: { ...previous[tier], [field]: value } } : previous));
+  }
+
+  function save(next = drafts) {
+    if (!next || !state) return;
+    if (JSON.stringify(next) === JSON.stringify(state.settings)) return;
+    void window.newbie.saveModelTiers(next).then(stored => {
+      setState(stored);
+      setDrafts(stored.settings);
+    });
+  }
+
+  return (
+    <section className="settings-group">
+      <h2 className="settings-group-title">모델 등급</h2>
+      <p className="settings-group-desc">
+        대화 모델이 보조 에이전트에게 일을 맡길 때, 일의 난이도에 맞춰 아래 등급 중 하나를 고릅니다.
+        칸을 비워 두면 기본값을 씁니다.
+      </p>
+      {TIER_ROWS.map(({ tier, label, hint }) => {
+        const draft = drafts?.[tier] ?? { provider: '', model: '' };
+        const resolved = state?.resolved[tier];
+        const current = resolved ? `${resolved.provider} / ${resolved.model}` : '';
+        return (
+          <SettingsRow
+            hint={`${hint}${current ? ` · 지금: ${current}${resolved?.isDefault ? ' (기본값)' : ''}` : ''}`}
+            key={tier}
+            label={label}
+          >
+            <div className="settings-tier">
+              <select
+                aria-label={`${label} 등급 제공자`}
+                className="settings-select"
+                disabled={!state}
+                onChange={event => {
+                  const next = drafts && { ...drafts, [tier]: { ...drafts[tier], provider: event.target.value } };
+                  setDrafts(next);
+                  save(next);
+                }}
+                value={draft.provider}
+              >
+                <option value="">기본값</option>
+                {(state?.providers ?? []).map(name => (
+                  <option key={name} value={name}>
+                    {PROVIDER_LABELS[name] ?? name}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label={`${label} 등급 모델`}
+                className="settings-input"
+                disabled={!state}
+                onBlur={() => save()}
+                onChange={event => update(tier, 'model', event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') save();
+                }}
+                placeholder={resolved?.model ?? ''}
+                type="text"
+                value={draft.model}
+              />
+            </div>
+          </SettingsRow>
+        );
+      })}
     </section>
   );
 }

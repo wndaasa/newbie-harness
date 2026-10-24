@@ -312,6 +312,17 @@ export type Preferences = {
   instructions: string;
 };
 
+/** 보조 에이전트 모델 등급 (main의 src/settings/modelTiers.ts와 같은 모양) */
+export type ModelTier = 'fast' | 'local' | 'strong';
+export type TierChoice = { provider: string; model: string };
+export type ModelTierState = {
+  providers: string[];
+  /** 저장값. 비어 있으면 기본값을 쓴다 */
+  settings: Record<ModelTier, TierChoice>;
+  /** 지금 대화 기준으로 실제 쓰일 값 */
+  resolved: Record<ModelTier, TierChoice & { isDefault: boolean }>;
+};
+
 /** 설정창 > 제공자 탭의 한 줄. 비밀 항목의 실제 값은 여기 담기지 않는다 */
 export type CredentialField = {
   key: string;
@@ -340,6 +351,8 @@ export type NewbieBridge = {
   sessions(): Promise<SessionSummary[]>;
   preferences(): Promise<Preferences>;
   savePreferences(patch: Partial<Preferences>): Promise<Preferences>;
+  modelTiers(): Promise<ModelTierState>;
+  saveModelTiers(patch: Partial<Record<ModelTier, TierChoice>>): Promise<ModelTierState>;
   credentials(): Promise<CredentialState>;
   saveCredentials(patch: Record<string, string>): Promise<CredentialState>;
   providerReady(): Promise<boolean>;

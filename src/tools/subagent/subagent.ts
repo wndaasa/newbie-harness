@@ -16,7 +16,14 @@
 
 import { runAgentLoop, stopSummary } from '../../agent/loop.ts';
 import type { AgentLoopContext, ToolRequest } from '../../agent/loop.ts';
-import { buildSubagentSystemPrompt } from '../../config.ts';
+import { buildSubagentSystemPrompt, getDefaultModel } from '../../config.ts';
+import {
+  MODEL_TIER_LABELS,
+  isModelTier,
+  readModelTiers,
+  resolveModelTier,
+} from '../../settings/modelTiers.ts';
+import type { ModelTier } from '../../settings/modelTiers.ts';
 import { registerTool } from '../registry.ts';
 import type { SessionToolCall } from '../../session/storage.ts';
 import type { Session } from '../../session/types.ts';
@@ -92,10 +99,29 @@ function collectToolCalls(turns: { toolCalls?: SessionToolCall[] }[]): SessionTo
   return turns.flatMap(turn => turn.toolCalls ?? []);
 }
 
+/**
+ * 자식이 쓸 제공자·모델. 등급이 없으면 부모와 같다(예전 동작).
+ * 키가 있는지는 프로세스 환경으로 본다 — 설정창에 저장한 키도 여기에 얹힌다
+ */
+export function childModelFor(
+  parentSession: Pick<Session, 'model' | 'provider'>,
+  tier: ModelTier | undefined,
+): { model: string; provider: string } {
+  if (!tier) return { model: parentSession.model, provider: parentSession.provider };
+  const { model, provider } = resolveModelTier(tier, readModelTiers(), {
+    defaultModel: getDefaultModel,
+    hasKey: name =>
+      Boolean(process.env[name === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY']),
+    model: parentSession.model,
+    provider: parentSession.provider,
+  });
+  return { model, provider };
+}
+
 export async function runSubagent(
   parentSession: Session,
   parent: AgentLoopContext,
-  input: { callId: string; kind: SubagentKind; task: string },
+  input: { callId: string; kind: SubagentKind; task: string; tier?: ModelTier },
 ): Promise<{ children: SessionToolCall[]; text: string }> {
   const depth = (parent.depth ?? 0) + 1;
   if (depth > MAX_DEPTH) {
@@ -104,6 +130,7 @@ export async function runSubagent(
 
   const child: Session = {
     ...parentSession,
+    ...childModelFor(parentSession, input.tier),
     // 부모의 접힌 자리는 부모 이력 기준이라 자식에는 맞지 않는다
     compaction: undefined,
     initialRows: [],
@@ -148,10 +175,16 @@ export async function runSubagent(
   }
 }
 
+/** "빠름 등급(anthropic/claude-haiku-5-5)" 같은 표시. 모델이 어느 모델에 맡겼는지 안다 */
+function childLabel(session: Session, tier: ModelTier | undefined): string {
+  const { model, provider } = childModelFor(session, tier);
+  return `${MODEL_TIER_LABELS[tier ?? 'strong']} 등급(${provider}/${model})`;
+}
+
 /** 백그라운드로 띄운 직후 모델에게 돌려주는 결과 */
-function startedMessage(description: string): string {
+function startedMessage(description: string, modelLabel: string): string {
   return [
-    `보조 에이전트 "${description}"을(를) 백그라운드로 시작했습니다. 보고는 끝나는 대로 [자동 알림] 메시지로 도착합니다.`,
+    `보조 에이전트 "${description}"을(를) 백그라운드로 시작했습니다 (${modelLabel}). 보고는 끝나는 대로 [자동 알림] 메시지로 도착합니다.`,
     '그동안 이 보고에 의존하지 않는 일을 계속하세요. 남은 일이 보고를 기다리는 것뿐이면 기다린다고',
     '한 줄만 쓰고 응답을 끝내세요 — 보고가 오면 이어서 진행합니다. 보고 내용을 미리 지어내지 마세요.',
   ].join(' ');
@@ -169,6 +202,10 @@ registerTool({
     '서로 독립된 조사는 한 응답에서 여러 번 호출해 동시에 돌리세요.',
     '보조 에이전트는 이 대화를 볼 수 없으니 prompt에 배경·찾을 것·보고 형식을 완결되게 적으세요.',
     'type: explore(기본, 읽기 전용 — 읽기·검색·git 조회·웹만) | general(파일 수정·셸 실행 가능, 부모와 같은 승인 규칙).',
+    'tier: 일의 난이도에 맞는 모델 등급. fast(빠르고 싼 모델 — 파일 찾기, 단순 조사, 요약처럼 판단이 적은 일),',
+    'local(로컬 모델 — 비용 없이 돌릴 단순 읽기 조사. 도구 호출이 서툴 수 있어 explore에만 권장),',
+    'strong(기본, 지금 대화 모델 — 설계 판단, 여러 파일에 걸친 수정, 미묘한 버그 추적).',
+    '판단이 적은 일은 fast로 내려 비용과 시간을 아끼세요. 보고가 부실하면 한 등급 올려 다시 맡기세요.',
   ].join(' '),
   parameters: {
     type: 'object',
@@ -185,10 +222,14 @@ registerTool({
         type: 'string',
         description: 'explore(기본, 읽기 전용) 또는 general(수정·실행 가능)',
       },
+      tier: {
+        type: 'string',
+        description: 'fast | local | strong(기본). 일의 난이도에 맞춰 고른다',
+      },
     },
     required: ['description', 'prompt'],
   },
-  async execute({ description, prompt, type }, context) {
+  async execute({ description, prompt, tier, type }, context) {
     if (!context) {
       throw new Error('spawn_agent는 에이전트 루프 안에서만 쓸 수 있습니다.');
     }
@@ -200,8 +241,10 @@ registerTool({
       throw new Error('description이 비어 있습니다. 무엇을 맡기는지 한 줄로 적어 주세요.');
     }
     const kind: SubagentKind = type === 'general' ? 'general' : 'explore';
+    // 모르는 등급은 기본(strong)으로 — 모델이 철자를 틀렸다고 일을 거절하지 않는다
+    const modelTier: ModelTier | undefined = isModelTier(tier) && tier !== 'strong' ? tier : undefined;
     const parent = context.agent;
-    const input = { callId: context.callId, kind, task };
+    const input = { callId: context.callId, kind, task, tier: modelTier };
     // 보고를 받을 곳이 없으면(CLI 단발 실행) 예전처럼 기다렸다 결과를 돌려준다
     if (!parent.onAgentReport) return runSubagent(context.session, parent, input);
 
@@ -228,6 +271,6 @@ registerTool({
           text,
         });
       });
-    return { background: true, text: startedMessage(label) };
+    return { background: true, text: startedMessage(label, childLabel(context.session, modelTier)) };
   },
 });

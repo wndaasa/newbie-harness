@@ -184,6 +184,8 @@ samp {
   --pad-chip: 4px 12px; /*    상태 칩 */
   --pad-badge: 2px 6px; /*    글줄 안에 박히는 작은 표식 */
   --sidebar-width: 280px;
+  /* body의 글자 외곽선 굵기 */
+  --text-stroke: 0.25px;
 }
 
 /* 다크 팔레트 — 무채색 회색 기반.
@@ -257,6 +259,18 @@ body {
   font-variant-ligatures: common-ligatures;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
+  /*
+   * 한글을 어절 단위로 줄바꿈한다. 기본값은 글자 단위라 "질문"이 "질 / 문"으로
+   * 갈려 다음 줄로 넘어갔다. 한 어절이 줄보다 길 때(경로·URL)만 글자 사이에서 끊는다
+   */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  /*
+   * 글자 외곽선. Windows의 글꼴 렌더링에서 Pretendard 400이 흰 배경 위에 가늘고
+   * 흐리게 보였다. 같은 색의 얇은 외곽선을 둘러 획을 또렷하게 한다.
+   * 굵기를 한 단계 올리는 것보다 자간이 덜 뭉친다. 0이면 끈다
+   */
+  -webkit-text-stroke: var(--text-stroke) currentColor;
 }
 
 /* 아이콘은 글자 옆에 서므로 baseline이 아니라 가운데로 맞춘다.
@@ -1025,6 +1039,28 @@ button > .icon:only-child {
   width: 260px;
 }
 
+/* 묶음 제목 아래의 설명 문단 */
+.settings-group-desc {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: -8px 0 8px;
+}
+
+/* 모델 등급 한 줄: 제공자 선택 + 모델 입력을 나란히 */
+.settings-tier {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-tier .settings-select {
+  width: 130px;
+}
+
+.settings-tier .settings-input {
+  width: 220px;
+}
+
 /* 기본 모델 선택. 입력 칸과 같은 폭·모양으로 맞춘다 */
 .settings-select {
   background: var(--bg-app);
@@ -1076,8 +1112,8 @@ button > .icon:only-child {
 
 .settings-input::placeholder,
 .settings-textarea::placeholder {
+  /* 반투명으로 흐리면 외곽선과 겹쳐 얼룩져 보인다. 흐린 글자색 하나로 구분한다 */
   color: var(--text-dim);
-  opacity: 0.7;
 }
 
 /* 입력 칸 옆에 저장·지우기 버튼이 붙는 줄 (API 키·서버 주소) */
@@ -1109,7 +1145,6 @@ button > .icon:only-child {
   color: var(--text-dim);
   cursor: default;
   font-weight: 400;
-  opacity: 0.6;
 }
 
 .settings-clear {
@@ -1317,8 +1352,8 @@ button > .icon:only-child {
 }
 
 .settings-choice-item:disabled {
+  color: var(--text-dim);
   cursor: default;
-  opacity: 0.5;
 }
 
 /* 제공자는 여섯 개라 테마(세 개)보다 촘촘하게. 한 줄에 안 들어가면 접는다 */

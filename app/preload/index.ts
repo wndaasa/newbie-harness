@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('newbie', {
   preferences: () => ipcRenderer.invoke('newbie:preferences'),
   savePreferences: (patch: Record<string, string>) =>
     ipcRenderer.invoke('newbie:save-preferences', patch),
+  modelTiers: () => ipcRenderer.invoke('newbie:model-tiers'),
+  saveModelTiers: (patch: unknown) => ipcRenderer.invoke('newbie:save-model-tiers', patch),
   credentials: () => ipcRenderer.invoke('newbie:credentials'),
   saveCredentials: (patch: Record<string, string>) =>
     ipcRenderer.invoke('newbie:save-credentials', patch),

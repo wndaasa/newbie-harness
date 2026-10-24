@@ -33,6 +33,13 @@ import {
 } from '../../src/settings/preferences.ts';
 import type { Preferences } from '../../src/settings/preferences.ts';
 import {
+  MODEL_TIERS,
+  readModelTiers,
+  resolveModelTier,
+  sanitizeModelTiers,
+  writeModelTiers,
+} from '../../src/settings/modelTiers.ts';
+import {
   countUnprocessedLogFiles,
   distillUnprocessedLogs,
   isCorrectionMessage,
@@ -498,6 +505,30 @@ export function createController({
   function savePreferences(patch: unknown): Preferences {
     // 렌더러에서 온 값이므로 저장 전에 모양을 맞춘다
     return writePreferences(sanitizePreferences(patch));
+  }
+
+  /*
+   * 모델 등급(보조 에이전트용). 저장값과 함께, 비워 둔 등급이 지금 대화 기준으로
+   * 무엇으로 풀리는지도 보낸다 — 설정창이 "기본값: anthropic/claude-haiku-5-5"를 보인다
+   */
+  function getModelTiers() {
+    const settings = readModelTiers();
+    const context = {
+      defaultModel: getDefaultModel,
+      hasKey: (name: string) =>
+        Boolean(process.env[name === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY']),
+      model: session.model,
+      provider: session.provider,
+    };
+    const resolved = Object.fromEntries(
+      MODEL_TIERS.map(tier => [tier, resolveModelTier(tier, settings, context)]),
+    );
+    return { providers: PROVIDERS, resolved, settings };
+  }
+
+  function saveModelTiers(patch: unknown) {
+    writeModelTiers(sanitizeModelTiers(patch, PROVIDERS));
+    return getModelTiers();
   }
 
   async function getWorkspace() {
@@ -2228,6 +2259,7 @@ export function createController({
     getGitDiffFiles,
     getGitDiffSummary,
     getInitialState,
+    getModelTiers,
     getPreferences,
     getSessionList,
     interjectNow,
@@ -2245,6 +2277,7 @@ export function createController({
     resumeSession,
     resyncFocused,
     retryLastTurn,
+    saveModelTiers,
     savePreferences,
     setFocus,
     setModel,
