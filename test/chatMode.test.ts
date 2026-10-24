@@ -147,6 +147,24 @@ describe('시스템 프롬프트', () => {
     expect(await buildSystemPrompt(session)).toContain('read only the parts you need');
   });
 
+  test('코딩 프롬프트만 보조 에이전트 등급 기준을 싣는다', async () => {
+    // 대화 모델은 그대로 두고 조각만 아래 등급에 넘긴다(턴마다 모델을 바꾸면 캐시가 깨진다).
+    // 언제 fast로 내리고 언제 strong에 두는지는 대화 모델이 이 기준으로 판단한다
+    const { buildSystemPrompt, createSession } = await import('../src/config.ts');
+    const session = createSession({ mock: true, noMemory: true });
+
+    setToolMode('coding');
+    session.mode = 'agent';
+    const coding = await buildSystemPrompt(session);
+    expect(coding).toContain('Pick the cheapest tier');
+    expect(coding).toContain('tier "fast"');
+    expect(coding).toContain('retried on strong automatically');
+
+    setToolMode('chat');
+    session.mode = 'chat';
+    expect(await buildSystemPrompt(session)).not.toContain('tier "fast"');
+  });
+
   test('채팅 프롬프트가 코딩보다 훨씬 짧다', async () => {
     const { buildSystemPrompt, createSession } = await import('../src/config.ts');
     const session = createSession({ mock: true, noMemory: true });
