@@ -167,6 +167,7 @@ export function App() {
             model: state.model,
             provider: state.provider,
             reasoningEffort: state.reasoningEffort,
+            reasoningEfforts: state.reasoningEfforts,
           },
           tokens: state.tokens,
         },
@@ -250,6 +251,7 @@ export function App() {
               model: event.model,
               provider: event.provider,
               reasoningEffort: event.reasoningEffort,
+              reasoningEfforts: event.reasoningEfforts,
             },
             tokens: event.tokens ?? state.tokens,
           }));

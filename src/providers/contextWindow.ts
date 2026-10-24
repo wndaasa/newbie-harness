@@ -1,11 +1,12 @@
 import { vllmBaseUrl } from './vllm.ts';
 import { llamaCppBaseUrl } from './llamacpp.ts';
+import { cachedAnthropicModelInfo, fetchAnthropicModelInfo } from './modelCapabilities.ts';
 
 // 프로바이더별 컨텍스트 창 크기 조회 (토큰 게이지용)
 //
-// Anthropic·OpenAI는 컨텍스트 창을 알려주는 API가 없어 모델별 공시 값 테이블을 쓰고,
-// Ollama(/api/show)·LM Studio(/api/v0/models)·llama.cpp(/props)는 로컬 API로
-// 실제 값을 조회함.
+// Anthropic(/v1/models/{id})·Ollama(/api/show)·LM Studio(/api/v0/models)·
+// llama.cpp(/props)·vLLM(/models)은 API로 실제 값을 조회한다. OpenAI는 창 크기를
+// 알려주는 API가 없어 공시 값 테이블을 쓰고, OPENAI_CONTEXT_WINDOW로 덮어쓸 수 있다.
 
 const FETCH_TIMEOUT_MS = 5_000;
 
@@ -19,8 +20,9 @@ const fetchedWindows = new Map<string, number>();
  */
 export const OLLAMA_DEFAULT_NUM_CTX = 32_768;
 
-// Anthropic은 전 모델 200k (Sonnet 1M은 별도 베타 헤더가 필요해 제외)
-const ANTHROPIC_CONTEXT_WINDOW = 200_000;
+// Anthropic은 Models API(max_input_tokens)로 모델별 실제 값을 조회한다
+// (modelCapabilities.ts). 이 값은 조회 전이거나 실패했을 때만 쓰는 보수적 기본값이다
+const ANTHROPIC_FALLBACK_CONTEXT_WINDOW = 200_000;
 
 // OpenAI 모델 패밀리별 공시 컨텍스트 창.
 // prefix 매칭이라 구체적인 이름이 먼저 와야 함 (gpt-4.1 → gpt-4o → gpt-4 순)
@@ -43,8 +45,13 @@ export function resolveContextWindow(provider: string, model: string): number {
   if (fetched) return fetched;
 
   const name = String(model).toLowerCase();
-  if (provider === 'anthropic') return ANTHROPIC_CONTEXT_WINDOW;
+  if (provider === 'anthropic') {
+    return cachedAnthropicModelInfo(model)?.contextWindow ?? ANTHROPIC_FALLBACK_CONTEXT_WINDOW;
+  }
   if (provider === 'openai') {
+    // 표에 없는 새 모델이나 호환 서버는 사용자가 값을 줄 수 있게 한다
+    const override = Number(process.env.OPENAI_CONTEXT_WINDOW);
+    if (Number.isFinite(override) && override > 0) return override;
     for (const [prefix, window] of OPENAI_CONTEXT_WINDOWS) {
       if (name.startsWith(prefix)) return window;
     }
@@ -70,6 +77,7 @@ export async function fetchContextWindow(
 
   try {
     let window: number | null = null;
+    if (provider === 'anthropic') window = (await fetchAnthropicModelInfo(model))?.contextWindow ?? null;
     if (provider === 'ollama') window = await fetchOllamaContextWindow(model);
     if (provider === 'lmstudio') window = await fetchLmStudioContextWindow(model);
     if (provider === 'llamacpp') window = await fetchLlamaCppContextWindow();

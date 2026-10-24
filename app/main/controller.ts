@@ -73,9 +73,10 @@ import { isReasoningModel } from '../../src/providers/openai.ts';
 import type { AgentReport, BlockedCall, Interjection } from '../../src/agent/loop.ts';
 import {
   DEFAULT_REASONING_EFFORT,
-  REASONING_EFFORT_OPTIONS,
   effortForProvider,
+  effortLabel,
   isReasoningEffort,
+  reasoningEffortOptions,
 } from '../../src/providers/openaiResponses.ts';
 import {
   applyLoadedSession,
@@ -474,7 +475,7 @@ export function createController({
       providerReady: isProviderReady(),
       providers: PROVIDERS,
       reasoningEffort: getReasoningEffort(),
-      reasoningEfforts: REASONING_EFFORT_OPTIONS,
+      reasoningEfforts: reasoningEffortsOf(session),
       rows: session.initialRows ?? [],
       sessionId: session.sessionId,
       tabMode,
@@ -711,7 +712,16 @@ export function createController({
       (target.provider === 'openai' && isReasoningModel(target.model));
     if (!applies) return null;
     // 칩에는 실제로 보내는 값을 보인다. OpenAI에서 고른 "끔"이 Anthropic에서는 낮음으로 간다
-    return effortForProvider(target.provider, target.reasoningEffort ?? DEFAULT_REASONING_EFFORT);
+    return effortForProvider(
+      target.provider,
+      target.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+      target.model,
+    );
+  }
+
+  /** 노력 메뉴의 선택지. 제공자·모델이 실제로 구분하는 단계만 (Anthropic은 조회한 값) */
+  function reasoningEffortsOf(target: Session) {
+    return reasoningEffortOptions(target.provider, target.model);
   }
 
   function getReasoningEffort(): string | null {
@@ -721,8 +731,7 @@ export function createController({
   function setReasoningEffort(value: unknown) {
     if (!isReasoningEffort(value)) return;
     session.reasoningEffort = value;
-    const label = REASONING_EFFORT_OPTIONS.find(entry => entry.value === value)?.label ?? value;
-    setNotice(`추론 노력: ${label}`);
+    setNotice(`추론 노력: ${effortLabel(value)}`);
     persistConfig();
     emitSessionMeta();
   }
@@ -1064,14 +1073,16 @@ export function createController({
     }
   }
 
-  // 로컬 프로바이더(ollama·lmstudio)의 실제 창 크기는 비동기 조회 후 게이지에 반영함
+  // 실제 창 크기(Anthropic·로컬 제공자)는 비동기 조회 후 게이지에 반영함.
+  // Anthropic은 같은 조회로 받는 추론 강도 단계도 오므로 창 크기가 같아도 메타를 다시 보낸다
   function refreshContextWindow() {
     const provider = session.provider;
     const model = session.model;
     const fallback = resolveContextWindow(provider, model);
     void fetchContextWindow(provider, model).then(window => {
       // 조회 중 프로바이더·모델이 바뀌었으면 이 값은 버림
-      if (!window || window === fallback) return;
+      if (!window) return;
+      if (window === fallback && provider !== 'anthropic') return;
       if (provider !== session.provider || model !== session.model) return;
       emitSessionMeta();
     });
@@ -1092,6 +1103,7 @@ export function createController({
       model: target.model,
       provider: target.provider,
       reasoningEffort: reasoningEffortOf(target),
+      reasoningEfforts: reasoningEffortsOf(target),
       sessionId: target.sessionId,
       tokens: target.sessionId === session.sessionId ? getContextUsage() : null,
     });

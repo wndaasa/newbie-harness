@@ -4,6 +4,7 @@ import { readAnthropicStream } from './streams.ts';
 import { fetchWithRetry } from './fetchWithRetry.ts';
 import { anthropicSampling } from './sampling.ts';
 import { effortForProvider } from './openaiResponses.ts';
+import { supportsAnthropicEffort } from './anthropicModels.ts';
 import type { StreamResult } from './streams.ts';
 import {
   ENV_CONTEXT_MARKER,
@@ -87,15 +88,7 @@ function isEnvContext(message: AnthropicMessage | undefined): boolean {
   );
 }
 
-/**
- * output_config.effort를 받는 모델인가. Opus 4.5 이후, Sonnet 4.6 이후, Haiku 5 이후,
- * Fable·Mythos만 받고 Haiku 4.5·Sonnet 4.5 이전 모델은 이 필드에 400을 낸다
- */
-export function supportsAnthropicEffort(model: string): boolean {
-  return /^claude-(opus-4-[5-9]|sonnet-4-[6-9]|(opus|sonnet|haiku)-([5-9]|\d{2,})|fable-|mythos-)/.test(
-    model,
-  );
-}
+export { supportsAnthropicEffort };
 
 /**
  * 추론 강도. 보내지 않으면 모델 기본값으로 돈다(Haiku 5.5는 medium, Sonnet 5는 high).
@@ -108,7 +101,8 @@ export function anthropicEffort(
   reasoningEffort: string | undefined,
 ): Record<string, unknown> {
   if (!supportsAnthropicEffort(model)) return {};
-  const effort = noReasoning ? 'low' : effortForProvider('anthropic', reasoningEffort);
+  // 보조 호출은 모델이 받는 가장 낮은 단계로 보낸다 (이름이 아니라 조회한 목록 기준)
+  const effort = effortForProvider('anthropic', noReasoning ? 'none' : reasoningEffort, model);
   return { output_config: { effort } };
 }
 

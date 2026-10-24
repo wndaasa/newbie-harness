@@ -218,6 +218,8 @@ export type NewbieEvent =
       model: string;
       provider: string;
       reasoningEffort: string | null;
+      /** 이 세션의 제공자·모델이 구분하는 강도 단계 (노력 메뉴 선택지) */
+      reasoningEfforts: ReasoningEffortEntry[];
       sessionId: string;
       tokens: TokenUsage | null;
     }
