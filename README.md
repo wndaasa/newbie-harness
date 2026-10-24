@@ -208,7 +208,7 @@ stdio 서버는 `command`, `args`, `env`로 등록합니다. 켜 둔 서버는 �
 아래 요청도 지금 쓰는 제공자로 나가므로 사용량에 포함됩니다.
 
 - **분류기**: 자동 모드에서 허용목록 밖 셸 명령, 작업 폴더 밖 쓰기, 일부 MCP 도구를 판정할 때마다 한 번
-  - 모델은 Anthropic이면 `claude-haiku-4-5-20251001`, OpenAI면 `gpt-5.6-luna`, 나머지 제공자는 대화 모델
+  - 모델은 Anthropic이면 `claude-haiku-5-5`, OpenAI면 `gpt-5.6-luna`, 나머지 제공자는 대화 모델
   - `NEWBIE_CLASSIFIER_MODEL`로 바꿀 수 있음
 - **자동 제목**: 새 대화의 첫 턴이 끝난 뒤 한 번
 - **이력 압축**: 컨텍스트 창이 찼을 때와 `/compact`

@@ -23,7 +23,7 @@ import type { SessionModelMessage } from '../session/storage.ts';
 
 /** 제공자별 분류기 기본 모델. 판정은 짧고 잦아서 저가 라인을 쓴다 */
 const CLASSIFIER_MODELS: Record<string, string> = {
-  anthropic: 'claude-haiku-4-5-20251001',
+  anthropic: 'claude-haiku-5-5',
   openai: 'gpt-5.6-luna',
 };
 
