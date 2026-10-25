@@ -136,10 +136,12 @@ export const Markdown = memo(function Markdown({ content }: { content: string })
   return (
     <div className="md">
       {/* remark-gfm: 표·취소선·자동링크 등 GFM 확장 (기본 CommonMark에는 표가 없음)
-          remark-math + rehype-katex: $...$·$$...$$ 수식을 KaTeX로 렌더링 */}
+          remark-math + rehype-katex: 달러 두 개로 감싼 수식을 KaTeX로 렌더링. 달러 하나는
+          금액과 겹쳐 끈다 — 모델이 달러 하나로 쓴 수식은 normalizeMathDelimiters가
+          달러 두 개로 바꿔 넘긴다 */}
       <ReactMarkdown
         rehypePlugins={[rehypeKatex]}
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
         components={{
           a({ children, href, title }) {
             if (!isExternalHref(href)) return <a title={title}>{children}</a>;
