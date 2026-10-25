@@ -16,7 +16,19 @@ import {
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_API_VERSION = '2023-06-01';
 
-const EPHEMERAL = { type: 'ephemeral' } as const;
+/**
+ * 캐시 수명. 기본 5분이면 사용자가 답을 읽고 다음 메시지를 쓰는 사이에 캐시가
+ * 사라져, 긴 대화(수십만 토큰)는 메시지마다 처음부터 다시 읽느라 첫 응답까지
+ * 50초 가까이 걸렸다. 1시간 캐시는 쓰기 단가가 입력가의 2배(5분은 1.25배)지만
+ * 매 라운드 새로 쓰는 몫은 늘어난 부분뿐이고, 읽기 단가는 같다. 한 번만 덜
+ * 놓쳐도 그 차이를 넘는다. NEWBIE_CACHE_TTL=5m으로 예전처럼 돌릴 수 있다.
+ * 한 요청 안의 표시는 모두 같은 수명을 쓴다 (긴 수명이 짧은 것보다 앞에 와야 한다는 규칙)
+ */
+export function cacheMark(): { type: 'ephemeral'; ttl?: '1h' } {
+  return process.env.NEWBIE_CACHE_TTL?.trim() === '5m'
+    ? { type: 'ephemeral' }
+    : { type: 'ephemeral', ttl: '1h' };
+}
 
 /**
  * Anthropic은 OpenAI와 달리 캐시를 자동으로 걸어주지 않는다. `cache_control`을
@@ -31,12 +43,12 @@ function withToolCache(tools: unknown[]): unknown[] {
   if (!last || typeof last !== 'object') return tools;
   return [
     ...tools.slice(0, -1),
-    { ...(last as Record<string, unknown>), cache_control: EPHEMERAL },
+    { ...(last as Record<string, unknown>), cache_control: cacheMark() },
   ];
 }
 
 function cacheableSystem(systemPrompt: string) {
-  return [{ cache_control: EPHEMERAL, text: systemPrompt, type: 'text' }];
+  return [{ cache_control: cacheMark(), text: systemPrompt, type: 'text' }];
 }
 
 type AnthropicMessage = { content?: unknown; [key: string]: unknown };
@@ -74,7 +86,7 @@ export function withHistoryCache(messages: AnthropicMessage[]): AnthropicMessage
     ...messages.slice(0, end - 1),
     {
       ...last,
-      content: [...content.slice(0, -1), { ...lastBlock, cache_control: EPHEMERAL }],
+      content: [...content.slice(0, -1), { ...lastBlock, cache_control: cacheMark() }],
     },
     ...messages.slice(end),
   ];

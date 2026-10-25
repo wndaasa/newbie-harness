@@ -4,9 +4,26 @@
 // Anthropic은 캐시에서 읽은 토큰을 분당 입력 한도(ITPM)에 세지 않으므로, 이력
 // 캐시는 비용만이 아니라 한도 걸림 자체를 줄인다.
 
-import { describe, expect, test } from 'bun:test';
-import { withHistoryCache } from '../src/providers/anthropic.ts';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { cacheMark, withHistoryCache } from '../src/providers/anthropic.ts';
 import { ENV_CONTEXT_MARKER } from '../src/providers/types.ts';
+
+const MARK = { type: 'ephemeral', ttl: '1h' } as const;
+
+describe('캐시 수명', () => {
+  afterEach(() => {
+    delete process.env.NEWBIE_CACHE_TTL;
+  });
+
+  test('기본은 1시간이다 — 답을 읽고 다음 메시지를 쓰는 사이에 5분 캐시가 사라졌다', () => {
+    expect(cacheMark()).toEqual(MARK);
+  });
+
+  test('NEWBIE_CACHE_TTL=5m이면 예전처럼 5분 캐시를 쓴다', () => {
+    process.env.NEWBIE_CACHE_TTL = '5m';
+    expect(cacheMark()).toEqual({ type: 'ephemeral' });
+  });
+});
 
 describe('withHistoryCache', () => {
   test('마지막 메시지의 문자열 content를 블록으로 바꿔 캐시 표시를 단다', () => {
@@ -20,7 +37,7 @@ describe('withHistoryCache', () => {
     expect(result[0]).toEqual({ role: 'user', content: '첫 질문' });
     expect(result.at(-1)).toEqual({
       role: 'user',
-      content: [{ type: 'text', text: '다음 질문', cache_control: { type: 'ephemeral' } }],
+      content: [{ type: 'text', text: '다음 질문', cache_control: MARK }],
     });
   });
 
@@ -40,7 +57,7 @@ describe('withHistoryCache', () => {
     expect(content[1]).toEqual({
       type: 'text',
       text: '이거 봐줘',
-      cache_control: { type: 'ephemeral' },
+      cache_control: MARK,
     });
   });
 
@@ -68,7 +85,7 @@ describe('withHistoryCache', () => {
     expect(result[2]).toEqual({
       role: 'user',
       content: [
-        { type: 'tool_result', tool_use_id: 't1', content: '결과', cache_control: { type: 'ephemeral' } },
+        { type: 'tool_result', tool_use_id: 't1', content: '결과', cache_control: MARK },
       ],
     });
     // 한 요청의 표시는 4개까지다. 이력 쪽은 하나만 쓴다
@@ -91,12 +108,12 @@ describe('withHistoryCache', () => {
     // 첫 라운드가 표시한 메시지는 둘째 라운드에서 표시만 빠진 같은 내용이다
     expect(first[1]).toEqual({
       role: 'assistant',
-      content: [{ type: 'text', text: '답', cache_control: { type: 'ephemeral' } }],
+      content: [{ type: 'text', text: '답', cache_control: MARK }],
     });
     expect(second[1]).toEqual(history[1]);
     expect(second[2]).toEqual({
       role: 'user',
-      content: [{ type: 'text', text: '다음 질문', cache_control: { type: 'ephemeral' } }],
+      content: [{ type: 'text', text: '다음 질문', cache_control: MARK }],
     });
   });
 });

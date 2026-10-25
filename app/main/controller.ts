@@ -1358,6 +1358,18 @@ export function createController({
     }
   }
 
+  /** 세션 파일에 남은 마지막 실측 usage. 파일이 없거나(새 대화) 기록이 없으면 null */
+  function storedUsage(target: Session): StreamUsage | null {
+    try {
+      const usage = loadSessionById(target.sessionId, target.projectPath).usage;
+      return usage
+        ? { cachedInputTokens: usage.cached, inputTokens: usage.input, outputTokens: usage.output }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   // 파일이 있으면 그 세션의 행을, 없으면(새 대화 등) 빈 배열을 돌려준다
   function tryLoadSessionRows(id: string, projectPath: string): SessionRow[] {
     try {
@@ -1407,7 +1419,10 @@ export function createController({
       }
     }
     setFocusedSession(target, true);
-    lastUsage = turns.get(session.sessionId)?.usage ?? null;
+    // 사이드바에서 대화를 누르면 openViewedSession이 칸에 먼저 띄운 뒤 여기로 온다.
+    // 예전에는 돌고 있는 턴의 값만 봐서, 앱을 다시 켜고 대화를 열면 메시지를 보내기
+    // 전까지 게이지가 비어 있었다. 턴이 없으면 파일의 마지막 실측값을 되살린다
+    lastUsage = turns.get(session.sessionId)?.usage ?? storedUsage(session);
     emitTo(session, { type: 'permission-mode', value: session.permissionMode });
     setMode(session.mode);
     tabMode = session.mode === 'chat' ? 'chat' : 'agent';

@@ -220,6 +220,26 @@ test('턴 도중 다른 프로젝트의 대화로도 옮길 수 있고, 이전 �
   }
 });
 
+// 앱을 다시 켜고 사이드바에서 대화를 누르면 렌더러는 openViewedSession → setFocus 순으로
+// 부른다. 예전에는 setFocus가 돌고 있는 턴의 값만 봐서, 메시지를 보내기 전까지 게이지가 비었다
+test('저장된 대화를 칸에 띄우고 포커스하면 마지막 실측값으로 게이지가 바로 보인다', async () => {
+  const { controller, events, storage } = await setup();
+  const saved = { ...storage.createSessionPersistence(), mock: false, mode: 'agent' } as any;
+  storage.recordSessionMessages(saved, [
+    { role: 'user', content: '긴 대화' },
+    { role: 'assistant', content: '답변' },
+  ]);
+  storage.recordSessionUsage(saved, { cached: 480_000, input: 491_696, output: 2_311 });
+
+  controller.openViewedSession(saved.sessionId);
+  controller.setFocus(saved.sessionId);
+
+  const meta = [...events]
+    .reverse()
+    .find((event: any) => event.type === 'session-meta' && event.sessionId === saved.sessionId);
+  expect(meta?.tokens).toMatchObject({ cached: 480_000, input: 491_696, used: 491_696 + 2_311 });
+});
+
 // 사이드바 프로젝트 그룹의 +. 다른 대화의 턴이 도는 중이어도 그 폴더에서 새 대화를 연다
 test('턴 도중 다른 폴더에서 새 대화를 열 수 있고, 이전 턴은 원래 프로젝트에 기록된다', async () => {
   slowProvider();
